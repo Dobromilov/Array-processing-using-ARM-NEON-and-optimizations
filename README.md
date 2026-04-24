@@ -7,6 +7,14 @@
 векторную реализацию функции, которая вычисляет сумму модифицированных элементов
 массива, максимально используя аппаратные особенности ARM.
 
+## Установка необходимых пакетов
+
+```bash
+sudo apt update
+sudo apt install g++-arm-linux-gnueabihf gcc-arm-linux-gnueabihf
+sudo apt install qemu-user
+```
+
 ## Сборка и запуск (ARM через QEMU)
 
 Проект собирается кросс-компилятором `arm-linux-gnueabihf-g++`, исполняемый файл
