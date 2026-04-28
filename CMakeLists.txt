@@ -20,7 +20,8 @@ if(BUILD_SHARED_ARRAY_PROCESSING)
     target_compile_options(array_processing_shared PRIVATE -O3 -Wall -Wextra -Wpedantic)
 endif()
 
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm|armv7.*)$" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    # 32-bit ARM GNU toolchains usually need explicit NEON + hard-float flags.
     target_compile_options(array_processing_static PRIVATE -mfpu=neon -mfloat-abi=hard)
     if(TARGET array_processing_shared)
         target_compile_options(array_processing_shared PRIVATE -mfpu=neon -mfloat-abi=hard)
