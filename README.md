@@ -21,8 +21,8 @@ sudo apt install qemu-user
 создаётся в корне проекта как `go`.
 
 ```bash
-make build
-make run
+make host-build
+make host-run
 ```
 
 `make run` выполняет:
