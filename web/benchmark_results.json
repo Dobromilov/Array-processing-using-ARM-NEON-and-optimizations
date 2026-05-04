@@ -1,0 +1,53 @@
+{
+  "neon_enabled": false,
+  "metric": "average_time_ns_per_call",
+  "summary": {
+    "average_speedup": 0.940168,
+    "best_speedup": 1.052110,
+    "best_size": 1000000
+  },
+  "rows": [
+    {
+      "size": 10,
+      "basic_time_ns": 5,
+      "neon_time_ns": 5,
+      "speedup": 1.000000,
+      "repetitions": 2000000
+    },
+    {
+      "size": 100,
+      "basic_time_ns": 65,
+      "neon_time_ns": 123,
+      "speedup": 0.528455,
+      "repetitions": 200000
+    },
+    {
+      "size": 1000,
+      "basic_time_ns": 616,
+      "neon_time_ns": 592,
+      "speedup": 1.040541,
+      "repetitions": 20000
+    },
+    {
+      "size": 10000,
+      "basic_time_ns": 6187,
+      "neon_time_ns": 6201,
+      "speedup": 0.997742,
+      "repetitions": 2000
+    },
+    {
+      "size": 100000,
+      "basic_time_ns": 63522,
+      "neon_time_ns": 62145,
+      "speedup": 1.022158,
+      "repetitions": 200
+    },
+    {
+      "size": 1000000,
+      "basic_time_ns": 657457,
+      "neon_time_ns": 624894,
+      "speedup": 1.052110,
+      "repetitions": 20
+    }
+  ]
+}

@@ -4,8 +4,9 @@ HOST_BUILD_DIR ?= build-host
 BUILD_TYPE ?= Release
 TOOLCHAIN_FILE ?= cmake/toolchains/armhf.cmake
 QEMU_SYSROOT ?= /usr/arm-linux-gnueabihf
+WEB_PORT ?= 8080
 
-.PHONY: all configure build run host-configure host-build host-run native-arm-build native-arm-run clean rebuild
+.PHONY: all configure build run host-configure host-build host-run native-arm-build native-arm-run export-json web-run clean rebuild
 
 all: build
 
@@ -45,6 +46,12 @@ native-arm-build:
 
 native-arm-run: native-arm-build
 	./go
+
+export-json: host-build
+	./go --json web/benchmark_results.json --no-terminal
+
+web-run:
+	python3 web/server.py --port $(WEB_PORT)
 
 clean:
 	rm -rf $(BUILD_DIR) $(HOST_BUILD_DIR) go
