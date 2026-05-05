@@ -9,6 +9,7 @@
 #include <memory>
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -85,7 +86,7 @@ public:
         neon_times.clear();
         array_sizes.clear();
 
-        for (size_t i = 0; i < size_options.size(); i++) {
+        for (std::size_t i = 0; i < size_options.size(); i++) {
             run_single_benchmark(size_options[i]);
             benchmark_progress = static_cast<float>(i + 1) / size_options.size();
         }
@@ -105,7 +106,7 @@ public:
             ImGui::TableSetupColumn("Speedup", ImGuiTableColumnFlags_WidthFixed, 100.0f);
             ImGui::TableHeadersRow();
 
-            for (size_t i = 0; i < array_sizes.size(); i++) {
+            for (std::size_t i = 0; i < array_sizes.size(); i++) {
                 ImGui::TableNextRow();
                 ImGui::TableSetColumnIndex(0);
                 ImGui::Text("%s", size_labels[i].c_str());
@@ -175,28 +176,28 @@ public:
             float x_step = graph_size.x / (basic_times.size() - 1);
 
             std::vector<ImVec2> basic_points;
-            for (size_t i = 0; i < basic_times.size(); i++) {
+            for (std::size_t i = 0; i < basic_times.size(); i++) {
                 float x = graph_pos.x + (i * x_step);
                 float y = graph_pos.y + graph_size.y - (basic_times[i] / max_time * graph_size.y);
                 basic_points.push_back(ImVec2(x, y));
             }
 
-            for (size_t i = 0; i < basic_points.size() - 1; i++) {
+            for (std::size_t i = 0; i < basic_points.size() - 1; i++) {
                 draw_list->AddLine(basic_points[i], basic_points[i + 1], IM_COL32(100, 150, 255, 255), 3.0f);
             }
 
             std::vector<ImVec2> neon_points;
-            for (size_t i = 0; i < neon_times.size(); i++) {
+            for (std::size_t i = 0; i < neon_times.size(); i++) {
                 float x = graph_pos.x + (i * x_step);
                 float y = graph_pos.y + graph_size.y - (neon_times[i] / max_time * graph_size.y);
                 neon_points.push_back(ImVec2(x, y));
             }
 
-            for (size_t i = 0; i < neon_points.size() - 1; i++) {
+            for (std::size_t i = 0; i < neon_points.size() - 1; i++) {
                 draw_list->AddLine(neon_points[i], neon_points[i + 1], IM_COL32(100, 255, 100, 255), 3.0f);
             }
 
-            for (size_t i = 0; i < basic_points.size(); i++) {
+            for (std::size_t i = 0; i < basic_points.size(); i++) {
                 if (i >= 6) {
                     draw_list->AddCircleFilled(basic_points[i], 5.0f, IM_COL32(100, 150, 255, 255));
                     draw_list->AddCircle(basic_points[i], 5.0f, IM_COL32(255, 255, 255, 200), 2.0f);
@@ -211,7 +212,7 @@ public:
         ImVec2 text_pos = ImGui::GetCursorScreenPos();
         float x_step = graph_size.x / (array_sizes.size() - 1);
 
-        for (size_t i = 0; i < array_sizes.size(); i++) {
+        for (std::size_t i = 0; i < array_sizes.size(); i++) {
             if (i % 2 == 0 || i == array_sizes.size() - 1) {
                 float x = graph_pos.x + (x_step * i) - 15;
                 if (x < graph_pos.x) x = graph_pos.x;
@@ -238,7 +239,7 @@ public:
         if (array_sizes.empty()) return;
 
         std::vector<float> speedups;
-        for (size_t i = 0; i < basic_times.size(); i++) {
+        for (std::size_t i = 0; i < basic_times.size(); i++) {
             speedups.push_back(basic_times[i] / neon_times[i]);
         }
 
@@ -254,7 +255,7 @@ public:
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         ImVec2 start_pos = ImGui::GetCursorScreenPos();
 
-        for (size_t i = 0; i < speedups.size(); i++) {
+        for (std::size_t i = 0; i < speedups.size(); i++) {
             float bar_height = (speedups[i] / max_speedup) * 200;
             ImVec2 bar_start = ImVec2(start_pos.x + i * bar_width + 5, start_pos.y + 200 - bar_height);
             ImVec2 bar_end = ImVec2(start_pos.x + (i + 1) * bar_width, start_pos.y + 200);
