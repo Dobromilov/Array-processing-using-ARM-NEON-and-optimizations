@@ -1,73 +1,151 @@
-CMAKE ?= cmake
-BUILD_DIR ?= build-arm
-HOST_BUILD_DIR ?= build-host
-BUILD_TYPE ?= Release
-TOOLCHAIN_FILE ?= cmake/toolchains/armhf.cmake
-QEMU_SYSROOT ?= /usr/arm-linux-gnueabihf
+# NEON Performance Benchmark Makefile for Raspberry Pi
+CXX = g++
+CXXFLAGS = -std=c++17 -O3 -ftree-vectorize -ffast-math
+LDFLAGS = -lglfw -lGL -lpthread
 
-.PHONY: all configure build run host-configure host-build host-run clean rebuild help
+# Определение архитектуры ARM
+ARCH := $(shell uname -m)
+ifeq ($(ARCH), armv7l)
+    CXXFLAGS += -mfpu=neon -march=armv7-a -mtune=cortex-a7 -DARM_NEON_ENABLED=1
+    $(info Building for ARMv7 with NEON support)
+else ifeq ($(ARCH), aarch64)
+    CXXFLAGS += -march=armv8-a+simd -DARM_NEON_ENABLED=1
+    $(info Building for ARM64 with NEON support)
+else ifeq ($(ARCH), armv6l)
+    CXXFLAGS += -mfpu=vfp -march=armv6 -DARM_NEON_ENABLED=0
+    $(warning NEON not supported on ARMv6)
+else
+    CXXFLAGS += -DARM_NEON_ENABLED=0
+    $(warning Building for non-ARM architecture)
+endif
 
-all: build
+# Директории
+BUILD_DIR = build
+DEPS_DIR = deps
+BIN_DIR = bin
 
-configure:
-	@echo "Configuring for ARM cross-compilation..."
+# Исходные файлы
+SOURCES = main.cpp
+IMGUI_SOURCES = $(DEPS_DIR)/imgui/imgui.cpp \
+                $(DEPS_DIR)/imgui/imgui_draw.cpp \
+                $(DEPS_DIR)/imgui/imgui_tables.cpp \
+                $(DEPS_DIR)/imgui/imgui_widgets.cpp \
+                $(DEPS_DIR)/imgui/backends/imgui_impl_glfw.cpp \
+                $(DEPS_DIR)/imgui/backends/imgui_impl_opengl3.cpp
+
+HEADERS = array_sum.h
+
+# Объектные файлы
+OBJECTS = $(addprefix $(BUILD_DIR)/, $(notdir $(SOURCES:.cpp=.o))) \
+          $(addprefix $(BUILD_DIR)/, $(notdir $(IMGUI_SOURCES:.cpp=.o)))
+
+# Исполняемый файл
+TARGET = $(BIN_DIR)/neon_benchmark
+
+# Флаги для отладки
+ifeq ($(DEBUG), 1)
+    CXXFLAGS += -g -O0
+    $(info Debug build enabled)
+else
+    CXXFLAGS += -s
+endif
+
+# Цветной вывод
+GREEN = \033[0;32m
+RED = \033[0;31m
+YELLOW = \033[1;33m
+BLUE = \033[0;34m
+NC = \033[0m
+
+.PHONY: all clean run deps help debug
+
+all: deps $(TARGET)
+
+# Проверка и установка зависимостей
+deps:
+	@echo -e "$(BLUE)Checking dependencies...$(NC)"
+	@if ! command -v g++ >/dev/null 2>&1; then \
+		echo -e "$(RED)Error: g++ not found. Installing...$(NC)"; \
+		sudo apt-get update && sudo apt-get install -y g++; \
+	fi
+	@if ! ldconfig -p | grep -q libglfw; then \
+		echo -e "$(YELLOW)GLFW not found. Installing...$(NC)"; \
+		sudo apt-get install -y libglfw3-dev; \
+	fi
+	@if ! ldconfig -p | grep -q libGL; then \
+		echo -e "$(YELLOW)OpenGL not found. Installing...$(NC)"; \
+		sudo apt-get install -y libgl1-mesa-dev; \
+	fi
+	@echo -e "$(GREEN)✓ Dependencies satisfied$(NC)"
+	@mkdir -p $(DEPS_DIR) $(BUILD_DIR) $(BIN_DIR)
+	@$(MAKE) --no-print-directory download-deps
+
+download-deps:
+	@# Download ImGui if not exists
+	@if [ ! -d "$(DEPS_DIR)/imgui" ]; then \
+		echo -e "$(BLUE)Downloading ImGui...$(NC)"; \
+		git clone --depth 1 --branch v1.90.6 https://github.com/ocornut/imgui.git $(DEPS_DIR)/imgui; \
+		echo -e "$(GREEN)✓ ImGui downloaded$(NC)"; \
+	fi
+
+$(BUILD_DIR)/%.o: %.cpp $(HEADERS)
+	@echo -e "$(BLUE)Compiling $<...$(NC)"
 	@mkdir -p $(BUILD_DIR)
-	if [ -f $(BUILD_DIR)/CMakeCache.txt ]; then \
-		$(CMAKE) -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE); \
-	else \
-		$(CMAKE) -S . -B $(BUILD_DIR) \
-			-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
-			-DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN_FILE); \
-	fi
+	$(CXX) $(CXXFLAGS) -I$(DEPS_DIR)/imgui -I$(DEPS_DIR)/imgui/backends -c $< -o $@
 
-build: configure
-	@echo "Building ARM executable..."
-	$(CMAKE) --build $(BUILD_DIR) --parallel
-	@cp $(BUILD_DIR)/array_benchmark ./array_benchmark_arm
+$(BUILD_DIR)/%.o: $(DEPS_DIR)/imgui/%.cpp
+	@echo -e "$(BLUE)Compiling $<...$(NC)"
+	$(CXX) $(CXXFLAGS) -I$(DEPS_DIR)/imgui -I$(DEPS_DIR)/imgui/backends -c $< -o $@
 
-run: build
-	@echo "Running ARM NEON benchmark with QEMU..."
-	@if [ -f "./array_benchmark_arm" ]; then \
-		qemu-arm -L $(QEMU_SYSROOT) ./array_benchmark_arm; \
-	else \
-		echo "ARM executable not found. Please run 'make build' first."; \
-		exit 1; \
-	fi
+$(BUILD_DIR)/%.o: $(DEPS_DIR)/imgui/backends/%.cpp
+	@echo -e "$(BLUE)Compiling $<...$(NC)"
+	$(CXX) $(CXXFLAGS) -I$(DEPS_DIR)/imgui -I$(DEPS_DIR)/imgui/backends -c $< -o $@
 
-host-configure:
-	@echo "Configuring for host compilation..."
-	@mkdir -p $(HOST_BUILD_DIR)
-	$(CMAKE) -S . -B $(HOST_BUILD_DIR) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)
+$(TARGET): $(OBJECTS)
+	@echo -e "$(BLUE)Linking...$(NC)"
+	@mkdir -p $(BIN_DIR)
+	$(CXX) $(OBJECTS) -o $(TARGET) $(LDFLAGS)
+	@echo -e "$(GREEN)✓ Build complete!$(NC)"
+	@echo -e "$(GREEN)Executable: $(TARGET)$(NC)"
+	@ls -lh $(TARGET)
 
-host-build: host-configure
-	@echo "Building host executable..."
-	$(CMAKE) --build $(HOST_BUILD_DIR) --parallel
-	@cp $(HOST_BUILD_DIR)/array_benchmark ./array_benchmark_host
-
-host-run: host-build
-	@echo "Running host benchmark..."
-	@if [ -f "./array_benchmark_host" ]; then \
-		./array_benchmark_host; \
-	else \
-		echo "Host executable not found. Please run 'make host-build' first."; \
-		exit 1; \
-	fi
+run: $(TARGET)
+	@echo -e "$(BLUE)Running NEON Benchmark...$(NC)"
+	@echo -e "$(YELLOW)========================================$(NC)"
+	./$(TARGET)
 
 clean:
-	@echo "Cleaning build directories..."
-	rm -rf $(BUILD_DIR) $(HOST_BUILD_DIR)
-	@echo "Cleaning executables..."
-	rm -f array_benchmark_arm array_benchmark_host
-	@echo "Clean complete!"
+	@echo -e "$(YELLOW)Cleaning build files...$(NC)"
+	@rm -rf $(BUILD_DIR) $(BIN_DIR)
+	@echo -e "$(GREEN)✓ Clean complete$(NC)"
 
-rebuild: clean build
+clean-deps:
+	@echo -e "$(YELLOW)Removing dependencies...$(NC)"
+	@rm -rf $(DEPS_DIR)
+	@echo -e "$(GREEN)✓ Dependencies removed$(NC)"
+
+distclean: clean clean-deps
+	@echo -e "$(GREEN)✓ Full clean complete$(NC)"
+
+debug:
+	@$(MAKE) DEBUG=1 all
+
+info:
+	@echo -e "$(BLUE)Build Information:$(NC)"
+	@echo -e "Architecture: $(ARCH)"
+	@echo -e "Compiler: $(CXX)"
+	@echo -e "Flags: $(CXXFLAGS)"
+	@echo -e "Target: $(TARGET)"
 
 help:
-	@echo "Available commands:"
-	@echo "  make build        - Build ARM executable (cross-compile)"
-	@echo "  make run          - Run ARM executable with QEMU"
-	@echo "  make host-build   - Build native host executable"
-	@echo "  make host-run     - Run native host executable"
-	@echo "  make clean        - Clean build files and executables"
-	@echo "  make rebuild      - Clean and rebuild ARM executable"
-	@echo "  make help         - Show this help message"
+	@echo -e "$(BLUE)Available commands:$(NC)"
+	@echo -e "  $(GREEN)make deps$(NC)    - Install required dependencies"
+	@echo -e "  $(GREEN)make all$(NC)     - Build the project (default)"
+	@echo -e "  $(GREEN)make run$(NC)     - Build and run the benchmark"
+	@echo -e "  $(GREEN)make clean$(NC)   - Remove build files"
+	@echo -e "  $(GREEN)make debug$(NC)   - Build with debug symbols"
+	@echo -e "  $(GREEN)make info$(NC)    - Show build configuration"
+	@echo -e "  $(GREEN)make help$(NC)    - Show this help"
+	@echo ""
+	@echo -e "$(YELLOW)Quick start:$(NC)"
+	@echo -e "  $(GREEN)make deps && make run$(NC)"
