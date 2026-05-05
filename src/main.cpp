@@ -13,6 +13,10 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+
+#if defined(ARRAY_USE_GLES)
+#define GLFW_INCLUDE_ES2
+#endif
 #include <GLFW/glfw3.h>
 
 class PerformanceBenchmark {
@@ -311,6 +315,17 @@ int main() {
         return -1;
     }
 
+#if defined(ARRAY_USE_GLES)
+    const char* glsl_version = "#version 100";
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+#else
+    const char* glsl_version = "#version 130";
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+#endif
+
     GLFWwindow* window = glfwCreateWindow(1600, 1000, "NEON Performance Benchmark", NULL, NULL);
     if (!window) {
         std::cerr << "Failed to create window" << std::endl;
@@ -339,7 +354,7 @@ int main() {
     style.WindowPadding = ImVec2(15, 15);
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init("#version 130");
+    ImGui_ImplOpenGL3_Init(glsl_version);
 
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->AddFontDefault();

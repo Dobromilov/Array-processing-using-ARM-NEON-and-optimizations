@@ -1,88 +1,111 @@
-CXX = g++
-CXXFLAGS = -std=c++17 -O3 -ftree-vectorize -ffast-math
-LDFLAGS = -lglfw -lGL -lpthread
+CMAKE ?= cmake
+CMAKE_ARGS ?=
+BUILD_DIR ?= build-host
+BUILD_DIR_ARMHF ?= build-armhf
+BUILD_DIR_ARMHF_CLI ?= build-armhf-cli
+BUILD_TYPE ?= Release
+TARGET ?= array_benchmark
+CLI_TARGET ?= array_benchmark_cli
+JOBS ?= $(shell nproc 2>/dev/null || echo 4)
+TOOLCHAIN_ARMHF ?= cmake/toolchains/armhf.cmake
+QEMU_SYSROOT ?= /usr/arm-linux-gnueabihf
+ARM_RUNNER ?= scripts/run-armhf.sh
 
-# Определение архитектуры
-ARCH := $(shell uname -m)
-ifeq ($(ARCH), aarch64)
-    CXXFLAGS += -march=armv8-a+simd -DARM_NEON_ENABLED=1
-    $(info ✓ ARM64 with NEON)
-else ifeq ($(ARCH), armv7l)
-    CXXFLAGS += -mfpu=neon -march=armv7-a -DARM_NEON_ENABLED=1
-    $(info ✓ ARMv7 with NEON)
-else
-    CXXFLAGS += -DARM_NEON_ENABLED=0
-    $(info ✗ Non-ARM: $(ARCH))
-endif
+.PHONY: all configure build run host-configure host-build host-run \
+	armhf-configure armhf-build armhf-run armhf \
+	armhf-cli-configure armhf-cli-build armhf-cli-run \
+	run-armhf run-armhf-cli clean distclean info help
 
-# Пути
-SRC_DIR = src
-VENDORS_DIR = vendors
-BUILD_DIR = build
-BIN_DIR = .
+all: build
 
-# Исходники
-SOURCES = $(SRC_DIR)/main.cpp
-IMGUI_DIR = $(VENDORS_DIR)/imgui
-IMGUI_SOURCES = $(IMGUI_DIR)/imgui.cpp \
-                $(IMGUI_DIR)/imgui_draw.cpp \
-                $(IMGUI_DIR)/imgui_tables.cpp \
-                $(IMGUI_DIR)/imgui_widgets.cpp \
-                $(IMGUI_DIR)/backends/imgui_impl_glfw.cpp \
-                $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
+configure: host-configure
 
-HEADERS = $(SRC_DIR)/array_sum.h
+build: host-build
 
-# Объекты
-OBJECTS = $(BUILD_DIR)/main.o \
-          $(BUILD_DIR)/imgui.o \
-          $(BUILD_DIR)/imgui_draw.o \
-          $(BUILD_DIR)/imgui_tables.o \
-          $(BUILD_DIR)/imgui_widgets.o \
-          $(BUILD_DIR)/imgui_impl_glfw.o \
-          $(BUILD_DIR)/imgui_impl_opengl3.o
+run: host-run
 
-TARGET = $(BIN_DIR)/neon_benchmark
+host-configure:
+	$(CMAKE) -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) $(CMAKE_ARGS)
 
-.PHONY: all clean run setup
+host-build: host-configure
+	$(CMAKE) --build $(BUILD_DIR) --target $(TARGET) -j$(JOBS)
 
-all: setup $(TARGET)
+host-run: host-build
+	./$(BUILD_DIR)/$(TARGET)
 
-setup:
-	@mkdir -p $(BUILD_DIR)
-	@echo "Build directory created"
+armhf-configure:
+	@if [ -f $(BUILD_DIR_ARMHF)/CMakeCache.txt ]; then \
+		$(CMAKE) -S . -B $(BUILD_DIR_ARMHF) \
+			-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+			-DARRAY_BUILD_GUI=ON \
+			-DARRAY_BUILD_CLI=ON \
+			$(CMAKE_ARGS); \
+	else \
+		$(CMAKE) -S . -B $(BUILD_DIR_ARMHF) \
+			-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+			-DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN_ARMHF) \
+			-DARRAY_BUILD_GUI=ON \
+			-DARRAY_BUILD_CLI=ON \
+			$(CMAKE_ARGS); \
+	fi
 
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp $(HEADERS)
-	@echo "Compiling: $<"
-	$(CXX) $(CXXFLAGS) -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -I$(SRC_DIR) -c $< -o $@
+armhf-build: armhf-configure
+	$(CMAKE) --build $(BUILD_DIR_ARMHF) --target $(TARGET) -j$(JOBS)
 
-$(BUILD_DIR)/%.o: $(IMGUI_DIR)/%.cpp
-	@echo "Compiling: $<"
-	$(CXX) $(CXXFLAGS) -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -c $< -o $@
+armhf-run: armhf-build
+	QEMU_SYSROOT=$(QEMU_SYSROOT) $(ARM_RUNNER) $(BUILD_DIR_ARMHF)/$(TARGET)
 
-$(BUILD_DIR)/%.o: $(IMGUI_DIR)/backends/%.cpp
-	@echo "Compiling: $<"
-	$(CXX) $(CXXFLAGS) -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -c $< -o $@
+armhf: armhf-build
 
-$(TARGET): $(OBJECTS)
-	@echo "Linking..."
-	$(CXX) $(OBJECTS) -o $(TARGET) $(LDFLAGS)
-	@echo "✓ Build complete: $(TARGET)"
-	@ls -lh $(TARGET)
+armhf-cli-configure:
+	@if [ -f $(BUILD_DIR_ARMHF_CLI)/CMakeCache.txt ]; then \
+		$(CMAKE) -S . -B $(BUILD_DIR_ARMHF_CLI) \
+			-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+			-DARRAY_BUILD_GUI=OFF \
+			-DARRAY_BUILD_CLI=ON \
+			$(CMAKE_ARGS); \
+	else \
+		$(CMAKE) -S . -B $(BUILD_DIR_ARMHF_CLI) \
+			-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+			-DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN_ARMHF) \
+			-DARRAY_BUILD_GUI=OFF \
+			-DARRAY_BUILD_CLI=ON \
+			$(CMAKE_ARGS); \
+	fi
 
-run: $(TARGET)
-	@echo "Running benchmark..."
-	@echo "================================"
-	./$(TARGET)
+armhf-cli-build: armhf-cli-configure
+	$(CMAKE) --build $(BUILD_DIR_ARMHF_CLI) --target $(CLI_TARGET) -j$(JOBS)
+
+armhf-cli-run: armhf-cli-build
+	QEMU_SYSROOT=$(QEMU_SYSROOT) $(ARM_RUNNER) $(BUILD_DIR_ARMHF_CLI)/$(CLI_TARGET)
+
+run-armhf: armhf-run
+
+run-armhf-cli: armhf-cli-run
 
 clean:
-	@rm -rf $(BUILD_DIR) $(TARGET)
-	@echo "✓ Clean complete"
+	$(CMAKE) --build $(BUILD_DIR) --target clean 2>/dev/null || true
+	$(CMAKE) --build $(BUILD_DIR_ARMHF) --target clean 2>/dev/null || true
+	$(CMAKE) --build $(BUILD_DIR_ARMHF_CLI) --target clean 2>/dev/null || true
+
+distclean:
+	rm -rf $(BUILD_DIR) $(BUILD_DIR_ARMHF) $(BUILD_DIR_ARMHF_CLI)
 
 info:
-	@echo "=== Build Info ==="
-	@echo "Arch: $(ARCH)"
-	@echo "CXX: $(CXX)"
-	@echo "Flags: $(CXXFLAGS)"
-	@echo "Target: $(TARGET)"
-	@echo "NEON: $(shell [ $(ARM_NEON_ENABLED) ] && echo Yes || echo No)"
+	@echo "BUILD_DIR=$(BUILD_DIR)"
+	@echo "CMAKE_ARGS=$(CMAKE_ARGS)"
+	@echo "BUILD_DIR_ARMHF=$(BUILD_DIR_ARMHF)"
+	@echo "BUILD_DIR_ARMHF_CLI=$(BUILD_DIR_ARMHF_CLI)"
+	@echo "BUILD_TYPE=$(BUILD_TYPE)"
+	@echo "TARGET=$(TARGET)"
+	@echo "CLI_TARGET=$(CLI_TARGET)"
+	@echo "TOOLCHAIN_ARMHF=$(TOOLCHAIN_ARMHF)"
+	@echo "QEMU_SYSROOT=$(QEMU_SYSROOT)"
+
+help:
+	@echo "Available commands:"
+	@echo "  make host-run        Build and run the GUI for the current machine"
+	@echo "  make armhf-run       Cross-build and run the ARM GUI via qemu-arm"
+	@echo "  make armhf-cli-run   Cross-build and run the ARM console smoke benchmark"
+	@echo "  make clean           Clean configured build directories"
+	@echo "  make distclean       Remove build directories"

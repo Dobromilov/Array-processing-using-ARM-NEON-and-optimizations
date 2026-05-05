@@ -1,3 +1,8 @@
 *go
+array_benchmark
+array_benchmark_*
 build-arm/
+build-armhf/
+build-armhf-cli/
 build-host/
+build-rpi/
