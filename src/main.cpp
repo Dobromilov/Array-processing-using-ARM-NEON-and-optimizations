@@ -9,10 +9,15 @@
 #include <memory>
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+
+#if defined(ARRAY_USE_GLES)
+#define GLFW_INCLUDE_ES2
+#endif
 #include <GLFW/glfw3.h>
 
 class PerformanceBenchmark {
@@ -24,17 +29,42 @@ private:
     bool is_benchmarking = false;
     float benchmark_progress = 0.0f;
 
-    const std::vector<int> size_options = {
-        10, 50, 100, 500, 1000, 5000,
+    // Основные размеры для отображения на оси X
+    const std::vector<int> display_sizes = {
+        100, 500, 1000, 5000,
         10000, 50000, 100000, 250000, 500000,
         750000, 1000000, 2500000, 5000000, 10000000
     };
 
-    const std::vector<std::string> size_labels = {
-        "10", "50", "100", "500", "1k", "5k",
+    const std::vector<std::string> display_labels = {
+        "100", "500", "1k", "5k",
         "10k", "50k", "100k", "250k", "500k",
         "750k", "1M", "2.5M", "5M", "10M"
     };
+
+    // Функция для генерации промежуточных точек между двумя размерами
+    std::vector<int> generate_intermediate_sizes(int start, int end) {
+        std::vector<int> sizes;
+        if (start == end) {
+            sizes.push_back(start);
+            return sizes;
+        }
+
+        // Используем логарифмическую шкалу для более равномерного распределения
+        double log_start = std::log10(start);
+        double log_end = std::log10(end);
+
+        for (int i = 0; i <= 10; i++) {  // 10 промежуточных точек включая края
+            double t = i / 10.0;
+            double log_val = log_start + t * (log_end - log_start);
+            int size = static_cast<int>(std::round(std::pow(10, log_val)));
+            // Гарантируем уникальность и избегаем дубликатов
+            if (sizes.empty() || sizes.back() != size) {
+                sizes.push_back(size);
+            }
+        }
+        return sizes;
+    }
 
 public:
     PerformanceBenchmark() {
@@ -81,9 +111,23 @@ public:
         neon_times.clear();
         array_sizes.clear();
 
-        for (size_t i = 0; i < size_options.size(); i++) {
-            run_single_benchmark(size_options[i]);
-            benchmark_progress = static_cast<float>(i + 1) / size_options.size();
+        // Генерируем все размеры для бенчмаркинга (с промежуточными точками)
+        std::vector<int> all_sizes;
+        for (std::size_t i = 0; i < display_sizes.size() - 1; i++) {
+            std::vector<int> intermediate = generate_intermediate_sizes(display_sizes[i], display_sizes[i + 1]);
+            all_sizes.insert(all_sizes.end(), intermediate.begin(), intermediate.end());
+            // Убираем дубликат последнего элемента (он будет первым в следующем интервале)
+            if (!all_sizes.empty() && !intermediate.empty()) {
+                all_sizes.pop_back();
+            }
+        }
+        // Добавляем последний размер
+        all_sizes.push_back(display_sizes.back());
+
+        // Запускаем бенчмарки для всех размеров
+        for (std::size_t i = 0; i < all_sizes.size(); i++) {
+            run_single_benchmark(all_sizes[i]);
+            benchmark_progress = static_cast<float>(i + 1) / all_sizes.size();
         }
 
         is_benchmarking = false;
@@ -101,29 +145,35 @@ public:
             ImGui::TableSetupColumn("Speedup", ImGuiTableColumnFlags_WidthFixed, 100.0f);
             ImGui::TableHeadersRow();
 
-            for (size_t i = 0; i < array_sizes.size(); i++) {
-                ImGui::TableNextRow();
-                ImGui::TableSetColumnIndex(0);
-                ImGui::Text("%s", size_labels[i].c_str());
+            // Отображаем только основные размеры в таблице
+            int display_idx = 0;
+            for (std::size_t i = 0; i < array_sizes.size(); i++) {
+                if (display_idx < display_sizes.size() && array_sizes[i] == display_sizes[display_idx]) {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::Text("%s", display_labels[display_idx].c_str());
 
-                ImGui::TableSetColumnIndex(1);
-                if (basic_times[i] < 1.0f)
-                    ImGui::Text("%.3f", basic_times[i]);
-                else
-                    ImGui::Text("%.2f", basic_times[i]);
+                    ImGui::TableSetColumnIndex(1);
+                    if (basic_times[i] < 1.0f)
+                        ImGui::Text("%.3f", basic_times[i]);
+                    else
+                        ImGui::Text("%.2f", basic_times[i]);
 
-                ImGui::TableSetColumnIndex(2);
-                if (neon_times[i] < 1.0f)
-                    ImGui::Text("%.3f", neon_times[i]);
-                else
-                    ImGui::Text("%.2f", neon_times[i]);
+                    ImGui::TableSetColumnIndex(2);
+                    if (neon_times[i] < 1.0f)
+                        ImGui::Text("%.3f", neon_times[i]);
+                    else
+                        ImGui::Text("%.2f", neon_times[i]);
 
-                ImGui::TableSetColumnIndex(3);
-                float speedup = basic_times[i] / neon_times[i];
-                ImVec4 color = speedup > 1.5f ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f) :
-                               speedup > 1.0f ? ImVec4(1.0f, 1.0f, 0.0f, 1.0f) :
-                               ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
-                ImGui::TextColored(color, "%.2fx", speedup);
+                    ImGui::TableSetColumnIndex(3);
+                    float speedup = basic_times[i] / neon_times[i];
+                    ImVec4 color = speedup > 1.5f ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f) :
+                                   speedup > 1.0f ? ImVec4(1.0f, 1.0f, 0.0f, 1.0f) :
+                                   ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
+                    ImGui::TextColored(color, "%.2fx", speedup);
+
+                    display_idx++;
+                }
             }
 
             ImGui::EndTable();
@@ -170,34 +220,44 @@ public:
         if (basic_times.size() > 1) {
             float x_step = graph_size.x / (basic_times.size() - 1);
 
+            // Рисуем линию для Basic
             std::vector<ImVec2> basic_points;
-            for (size_t i = 0; i < basic_times.size(); i++) {
+            for (std::size_t i = 0; i < basic_times.size(); i++) {
                 float x = graph_pos.x + (i * x_step);
                 float y = graph_pos.y + graph_size.y - (basic_times[i] / max_time * graph_size.y);
                 basic_points.push_back(ImVec2(x, y));
             }
 
-            for (size_t i = 0; i < basic_points.size() - 1; i++) {
-                draw_list->AddLine(basic_points[i], basic_points[i + 1], IM_COL32(100, 150, 255, 255), 3.0f);
+            for (std::size_t i = 0; i < basic_points.size() - 1; i++) {
+                draw_list->AddLine(basic_points[i], basic_points[i + 1], IM_COL32(100, 150, 255, 255), 2.0f);
             }
 
+            // Рисуем линию для NEON
             std::vector<ImVec2> neon_points;
-            for (size_t i = 0; i < neon_times.size(); i++) {
+            for (std::size_t i = 0; i < neon_times.size(); i++) {
                 float x = graph_pos.x + (i * x_step);
                 float y = graph_pos.y + graph_size.y - (neon_times[i] / max_time * graph_size.y);
                 neon_points.push_back(ImVec2(x, y));
             }
 
-            for (size_t i = 0; i < neon_points.size() - 1; i++) {
-                draw_list->AddLine(neon_points[i], neon_points[i + 1], IM_COL32(100, 255, 100, 255), 3.0f);
+            for (std::size_t i = 0; i < neon_points.size() - 1; i++) {
+                draw_list->AddLine(neon_points[i], neon_points[i + 1], IM_COL32(100, 255, 100, 255), 2.0f);
             }
 
-            for (size_t i = 0; i < basic_points.size(); i++) {
-                if (i >= 6) {
-                    draw_list->AddCircleFilled(basic_points[i], 5.0f, IM_COL32(100, 150, 255, 255));
-                    draw_list->AddCircle(basic_points[i], 5.0f, IM_COL32(255, 255, 255, 200), 2.0f);
-                    draw_list->AddCircleFilled(neon_points[i], 5.0f, IM_COL32(100, 255, 100, 255));
-                    draw_list->AddCircle(neon_points[i], 5.0f, IM_COL32(255, 255, 255, 200), 2.0f);
+            // Отмечаем только основные точки на графике
+            int display_idx = 0;
+            for (std::size_t i = 0; i < array_sizes.size(); i++) {
+                if (display_idx < display_sizes.size() && array_sizes[i] == display_sizes[display_idx]) {
+                    float x = graph_pos.x + (i * x_step);
+                    float y_basic = graph_pos.y + graph_size.y - (basic_times[i] / max_time * graph_size.y);
+                    float y_neon = graph_pos.y + graph_size.y - (neon_times[i] / max_time * graph_size.y);
+
+                    draw_list->AddCircleFilled(ImVec2(x, y_basic), 5.0f, IM_COL32(100, 150, 255, 255));
+                    draw_list->AddCircle(ImVec2(x, y_basic), 5.0f, IM_COL32(255, 255, 255, 200), 2.0f);
+                    draw_list->AddCircleFilled(ImVec2(x, y_neon), 5.0f, IM_COL32(100, 255, 100, 255));
+                    draw_list->AddCircle(ImVec2(x, y_neon), 5.0f, IM_COL32(255, 255, 255, 200), 2.0f);
+
+                    display_idx++;
                 }
             }
         }
@@ -207,25 +267,28 @@ public:
         ImVec2 text_pos = ImGui::GetCursorScreenPos();
         float x_step = graph_size.x / (array_sizes.size() - 1);
 
-        for (size_t i = 0; i < array_sizes.size(); i++) {
-            if (i % 2 == 0 || i == array_sizes.size() - 1) {
+        // Отображаем только основные метки на оси X
+        int display_idx = 0;
+        for (std::size_t i = 0; i < array_sizes.size(); i++) {
+            if (display_idx < display_sizes.size() && array_sizes[i] == display_sizes[display_idx]) {
                 float x = graph_pos.x + (x_step * i) - 15;
                 if (x < graph_pos.x) x = graph_pos.x;
                 if (x > graph_pos.x + graph_size.x - 30) x = graph_pos.x + graph_size.x - 30;
 
                 ImGui::GetWindowDrawList()->AddText(ImVec2(x, text_pos.y + 5),
                                                    IM_COL32(200, 200, 220, 255),
-                                                   size_labels[i].c_str());
+                                                   display_labels[display_idx].c_str());
+                display_idx++;
             }
         }
 
         ImGui::Dummy(ImVec2(0, 20));
         ImGui::Spacing();
         ImGui::Spacing();
-        ImGui::TextColored(ImVec4(0.4f, 0.6f, 1.0f, 1.0f), "Basic Sum");
+        ImGui::TextColored(ImVec4(0.4f, 0.6f, 1.0f, 1.0f), "NEON Optimized");
         ImGui::SameLine();
         ImGui::Spacing();
-        ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "NEON Optimized");
+        ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "Basic Sum");
         ImGui::SameLine();
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 10);
     }
@@ -234,8 +297,16 @@ public:
         if (array_sizes.empty()) return;
 
         std::vector<float> speedups;
-        for (size_t i = 0; i < basic_times.size(); i++) {
-            speedups.push_back(basic_times[i] / neon_times[i]);
+        std::vector<int> display_indices;
+
+        // Собираем speedup только для основных размеров
+        int display_idx = 0;
+        for (std::size_t i = 0; i < basic_times.size(); i++) {
+            if (display_idx < display_sizes.size() && array_sizes[i] == display_sizes[display_idx]) {
+                speedups.push_back(basic_times[i] / neon_times[i]);
+                display_indices.push_back(i);
+                display_idx++;
+            }
         }
 
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 10);
@@ -250,7 +321,7 @@ public:
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         ImVec2 start_pos = ImGui::GetCursorScreenPos();
 
-        for (size_t i = 0; i < speedups.size(); i++) {
+        for (std::size_t i = 0; i < speedups.size(); i++) {
             float bar_height = (speedups[i] / max_speedup) * 200;
             ImVec2 bar_start = ImVec2(start_pos.x + i * bar_width + 5, start_pos.y + 200 - bar_height);
             ImVec2 bar_end = ImVec2(start_pos.x + (i + 1) * bar_width, start_pos.y + 200);
@@ -268,10 +339,10 @@ public:
             draw_list->AddText(ImVec2(bar_start.x + (bar_width - text_size.x) / 2, bar_start.y - 20),
                               IM_COL32(255, 255, 255, 255), text);
 
-            if (i < size_labels.size()) {
-                ImVec2 label_size = ImGui::CalcTextSize(size_labels[i].c_str());
+            if (i < display_labels.size()) {
+                ImVec2 label_size = ImGui::CalcTextSize(display_labels[i].c_str());
                 draw_list->AddText(ImVec2(bar_start.x + (bar_width - label_size.x) / 2, start_pos.y + 205),
-                                  IM_COL32(180, 180, 220, 255), size_labels[i].c_str());
+                                  IM_COL32(180, 180, 220, 255), display_labels[i].c_str());
             }
         }
 
@@ -311,6 +382,17 @@ int main() {
         return -1;
     }
 
+#if defined(ARRAY_USE_GLES)
+    const char* glsl_version = "#version 100";
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+#else
+    const char* glsl_version = "#version 130";
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+#endif
+
     GLFWwindow* window = glfwCreateWindow(1600, 1000, "NEON Performance Benchmark", NULL, NULL);
     if (!window) {
         std::cerr << "Failed to create window" << std::endl;
@@ -339,7 +421,7 @@ int main() {
     style.WindowPadding = ImVec2(15, 15);
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init("#version 130");
+    ImGui_ImplOpenGL3_Init(glsl_version);
 
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->AddFontDefault();
