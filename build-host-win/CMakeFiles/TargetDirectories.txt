@@ -1,0 +1,13 @@
+C:/Users/sergx/CLionProjects/Array-processing-using-ARM-NEON-and-optimizations/build-host-win/CMakeFiles/imgui.dir
+C:/Users/sergx/CLionProjects/Array-processing-using-ARM-NEON-and-optimizations/build-host-win/CMakeFiles/array_processing_static.dir
+C:/Users/sergx/CLionProjects/Array-processing-using-ARM-NEON-and-optimizations/build-host-win/CMakeFiles/array_processing_shared.dir
+C:/Users/sergx/CLionProjects/Array-processing-using-ARM-NEON-and-optimizations/build-host-win/CMakeFiles/go.dir
+C:/Users/sergx/CLionProjects/Array-processing-using-ARM-NEON-and-optimizations/build-host-win/CMakeFiles/INSTALL.dir
+C:/Users/sergx/CLionProjects/Array-processing-using-ARM-NEON-and-optimizations/build-host-win/CMakeFiles/ALL_BUILD.dir
+C:/Users/sergx/CLionProjects/Array-processing-using-ARM-NEON-and-optimizations/build-host-win/CMakeFiles/ZERO_CHECK.dir
+C:/Users/sergx/CLionProjects/Array-processing-using-ARM-NEON-and-optimizations/build-host-win/vendors/glfw/CMakeFiles/uninstall.dir
+C:/Users/sergx/CLionProjects/Array-processing-using-ARM-NEON-and-optimizations/build-host-win/vendors/glfw/CMakeFiles/INSTALL.dir
+C:/Users/sergx/CLionProjects/Array-processing-using-ARM-NEON-and-optimizations/build-host-win/vendors/glfw/CMakeFiles/ALL_BUILD.dir
+C:/Users/sergx/CLionProjects/Array-processing-using-ARM-NEON-and-optimizations/build-host-win/vendors/glfw/src/CMakeFiles/glfw.dir
+C:/Users/sergx/CLionProjects/Array-processing-using-ARM-NEON-and-optimizations/build-host-win/vendors/glfw/src/CMakeFiles/update_mappings.dir
+C:/Users/sergx/CLionProjects/Array-processing-using-ARM-NEON-and-optimizations/build-host-win/vendors/glfw/src/CMakeFiles/INSTALL.dir

@@ -1,0 +1,9 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Users/sergx/CLionProjects/Array-processing-using-ARM-NEON-and-optimizations/build-host-win/cmake_install.cmake",
+		"C:/Users/sergx/CLionProjects/Array-processing-using-ARM-NEON-and-optimizations/build-host-win/vendors/glfw/cmake_install.cmake",
+		"C:/Users/sergx/CLionProjects/Array-processing-using-ARM-NEON-and-optimizations/build-host-win/vendors/glfw/src/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

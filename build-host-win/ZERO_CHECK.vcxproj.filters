@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\sergx\CLionProjects\Array-processing-using-ARM-NEON-and-optimizations\build-host-win\CMakeFiles\511281ab773392e052c0fcc00075b5c5\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{ACA52C47-C3FC-3771-A867-923647807AB4}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

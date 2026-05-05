@@ -1,0 +1,37 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\sergx\CLionProjects\Array-processing-using-ARM-NEON-and-optimizations\vendors\imgui\imgui.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\sergx\CLionProjects\Array-processing-using-ARM-NEON-and-optimizations\vendors\imgui\imgui_draw.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\sergx\CLionProjects\Array-processing-using-ARM-NEON-and-optimizations\vendors\imgui\imgui_tables.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\sergx\CLionProjects\Array-processing-using-ARM-NEON-and-optimizations\vendors\imgui\imgui_widgets.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\sergx\CLionProjects\Array-processing-using-ARM-NEON-and-optimizations\vendors\imgui\backends\imgui_impl_glfw.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\sergx\CLionProjects\Array-processing-using-ARM-NEON-and-optimizations\vendors\imgui\backends\imgui_impl_opengl3.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\sergx\CLionProjects\Array-processing-using-ARM-NEON-and-optimizations\vendors\implot\implot.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\sergx\CLionProjects\Array-processing-using-ARM-NEON-and-optimizations\vendors\implot\implot_items.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\sergx\CLionProjects\Array-processing-using-ARM-NEON-and-optimizations\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{64F015EE-F006-3155-B733-BEC3B6CF5835}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
