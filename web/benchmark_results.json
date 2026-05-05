@@ -2,51 +2,149 @@
   "neon_enabled": false,
   "metric": "average_time_ns_per_call",
   "summary": {
-    "average_speedup": 0.988310,
-    "best_speedup": 1.012088,
-    "best_size": 100000
+    "average_speedup": 1.020393,
+    "best_speedup": 1.161979,
+    "best_size": 50000
   },
   "rows": [
     {
-      "size": 10,
-      "basic_time_ns": 5,
-      "neon_time_ns": 5,
-      "speedup": 1.000000,
-      "repetitions": 2000000
-    },
-    {
-      "size": 100,
-      "basic_time_ns": 88,
-      "neon_time_ns": 96,
-      "speedup": 0.916667,
-      "repetitions": 200000
-    },
-    {
-      "size": 1000,
-      "basic_time_ns": 564,
-      "neon_time_ns": 564,
-      "speedup": 1.000000,
-      "repetitions": 20000
-    },
-    {
-      "size": 10000,
-      "basic_time_ns": 5723,
-      "neon_time_ns": 5712,
-      "speedup": 1.001926,
-      "repetitions": 2000
+      "size": 50000,
+      "basic_time_ns": 103243,
+      "neon_time_ns": 88851,
+      "speedup": 1.161979,
+      "repetitions": 400
     },
     {
       "size": 100000,
-      "basic_time_ns": 58189,
-      "neon_time_ns": 57494,
-      "speedup": 1.012088,
+      "basic_time_ns": 133553,
+      "neon_time_ns": 127034,
+      "speedup": 1.051317,
       "repetitions": 200
     },
     {
+      "size": 150000,
+      "basic_time_ns": 167731,
+      "neon_time_ns": 146244,
+      "speedup": 1.146926,
+      "repetitions": 133
+    },
+    {
+      "size": 200000,
+      "basic_time_ns": 197992,
+      "neon_time_ns": 194604,
+      "speedup": 1.017410,
+      "repetitions": 100
+    },
+    {
+      "size": 250000,
+      "basic_time_ns": 245863,
+      "neon_time_ns": 243369,
+      "speedup": 1.010248,
+      "repetitions": 80
+    },
+    {
+      "size": 300000,
+      "basic_time_ns": 294541,
+      "neon_time_ns": 292713,
+      "speedup": 1.006245,
+      "repetitions": 66
+    },
+    {
+      "size": 350000,
+      "basic_time_ns": 341219,
+      "neon_time_ns": 340257,
+      "speedup": 1.002827,
+      "repetitions": 57
+    },
+    {
+      "size": 400000,
+      "basic_time_ns": 393285,
+      "neon_time_ns": 390289,
+      "speedup": 1.007676,
+      "repetitions": 50
+    },
+    {
+      "size": 450000,
+      "basic_time_ns": 442435,
+      "neon_time_ns": 439167,
+      "speedup": 1.007441,
+      "repetitions": 44
+    },
+    {
+      "size": 500000,
+      "basic_time_ns": 487813,
+      "neon_time_ns": 486774,
+      "speedup": 1.002134,
+      "repetitions": 40
+    },
+    {
+      "size": 550000,
+      "basic_time_ns": 536368,
+      "neon_time_ns": 535984,
+      "speedup": 1.000716,
+      "repetitions": 36
+    },
+    {
+      "size": 600000,
+      "basic_time_ns": 584658,
+      "neon_time_ns": 585156,
+      "speedup": 0.999149,
+      "repetitions": 33
+    },
+    {
+      "size": 650000,
+      "basic_time_ns": 634728,
+      "neon_time_ns": 632037,
+      "speedup": 1.004258,
+      "repetitions": 30
+    },
+    {
+      "size": 700000,
+      "basic_time_ns": 682646,
+      "neon_time_ns": 681555,
+      "speedup": 1.001601,
+      "repetitions": 28
+    },
+    {
+      "size": 750000,
+      "basic_time_ns": 732253,
+      "neon_time_ns": 732653,
+      "speedup": 0.999454,
+      "repetitions": 26
+    },
+    {
+      "size": 800000,
+      "basic_time_ns": 781559,
+      "neon_time_ns": 780968,
+      "speedup": 1.000757,
+      "repetitions": 25
+    },
+    {
+      "size": 850000,
+      "basic_time_ns": 827968,
+      "neon_time_ns": 830006,
+      "speedup": 0.997545,
+      "repetitions": 23
+    },
+    {
+      "size": 900000,
+      "basic_time_ns": 877153,
+      "neon_time_ns": 876489,
+      "speedup": 1.000758,
+      "repetitions": 22
+    },
+    {
+      "size": 950000,
+      "basic_time_ns": 926090,
+      "neon_time_ns": 930798,
+      "speedup": 0.994942,
+      "repetitions": 21
+    },
+    {
       "size": 1000000,
-      "basic_time_ns": 576786,
-      "neon_time_ns": 577259,
-      "speedup": 0.999181,
+      "basic_time_ns": 970348,
+      "neon_time_ns": 975743,
+      "speedup": 0.994471,
       "repetitions": 20
     }
   ]

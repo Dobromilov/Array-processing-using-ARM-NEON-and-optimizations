@@ -1,0 +1,2 @@
+/usr/bin/arm-linux-gnueabihf-ar qc libarray_processing.a CMakeFiles/array_processing.dir/src/array_sum.cpp.o
+/usr/bin/arm-linux-gnueabihf-ranlib libarray_processing.a

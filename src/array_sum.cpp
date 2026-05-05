@@ -1,5 +1,7 @@
 #include "array_sum.h"
 
+#include <cstddef>
+
 int64_t sum_array_basic(const std::vector<int32_t>& v) {
     int64_t sum = 0;
 
@@ -18,7 +20,7 @@ int64_t sum_array_basic(const std::vector<int32_t>& v) {
 #include <arm_neon.h>
 
 int64_t sum_array_neon(const std::vector<int32_t>& v) {
-    size_t i = 0;
+    std::size_t i = 0;
     int32x4_t acc = vdupq_n_s32(0);
     int32x4_t zero = vdupq_n_s32(0);
 

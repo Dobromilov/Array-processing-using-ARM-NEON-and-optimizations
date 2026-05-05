@@ -1,0 +1,4 @@
+/home/dobormilov/Desktop/Работы/Array-processing-using-ARM-NEON-and-optimizations/build-armhf-cli/CMakeFiles/array_processing.dir
+/home/dobormilov/Desktop/Работы/Array-processing-using-ARM-NEON-and-optimizations/build-armhf-cli/CMakeFiles/array_benchmark_cli.dir
+/home/dobormilov/Desktop/Работы/Array-processing-using-ARM-NEON-and-optimizations/build-armhf-cli/CMakeFiles/edit_cache.dir
+/home/dobormilov/Desktop/Работы/Array-processing-using-ARM-NEON-and-optimizations/build-armhf-cli/CMakeFiles/rebuild_cache.dir

@@ -1,0 +1,1 @@
+/usr/bin/arm-linux-gnueabihf-g++ -mfpu=neon -mfloat-abi=hard -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/array_benchmark_cli.dir/link.d CMakeFiles/array_benchmark_cli.dir/src/cli_main.cpp.o -o array_benchmark_cli  libarray_processing.a

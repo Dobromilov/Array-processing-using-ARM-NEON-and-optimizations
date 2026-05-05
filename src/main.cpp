@@ -324,7 +324,12 @@ bool write_json_report(
 } // namespace
 
 int main(int argc, char** argv) {
-    const std::array<std::size_t, 6> sizes = {10, 100, 1000, 10000,100000,1000000};
+    const std::array<std::size_t, 20> sizes = {
+        50000, 100000, 150000, 200000, 250000,
+        300000, 350000, 400000, 450000, 500000,
+        550000, 600000, 650000, 700000, 750000,
+        800000, 850000, 900000, 950000, 1000000
+    };
     std::mt19937 gen(42);
     volatile int64_t sink = 0;
     bool with_color = supports_color_output();
