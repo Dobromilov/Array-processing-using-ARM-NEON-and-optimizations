@@ -329,8 +329,8 @@ bool write_json_report(
 
 int main(int argc, char** argv) {
     std::vector<std::size_t> sizes;
-    sizes.reserve(1001);
-    for (std::size_t size = 0; size <= 100000; size += 100) {
+    sizes.reserve(10);
+    for (std::size_t size = 10000000; size <= 100000000; size += 10000000) {
         sizes.push_back(size);
     }
 

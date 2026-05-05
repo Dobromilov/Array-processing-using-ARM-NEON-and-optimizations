@@ -26,15 +26,14 @@ function formatNs(value) {
   return `${formatInt(Math.round(value))} ns`;
 }
 
-function formatUsFromNs(value) {
-  return formatFloat(Number(value) / 1_000, 3);
+function formatMsFromNs(value) {
+  return formatFloat(Number(value) / 1_000_000, 3);
 }
 
-function formatUsLabel(valueUs) {
-  if (valueUs >= 1000) return `${formatFloat(valueUs, 0)} µs`;
-  if (valueUs >= 100) return `${formatFloat(valueUs, 1)} µs`;
-  if (valueUs >= 1) return `${formatFloat(valueUs, 2)} µs`;
-  return `${formatFloat(valueUs, 3)} µs`;
+function formatMsLabel(valueMs) {
+  if (valueMs >= 100) return `${formatFloat(valueMs, 0)} ms`;
+  if (valueMs >= 10) return `${formatFloat(valueMs, 1)} ms`;
+  return `${formatFloat(valueMs, 2)} ms`;
 }
 
 function toBarPercent(speedup) {
@@ -129,9 +128,9 @@ function App() {
     const plotH = height - margin.top - margin.bottom;
 
     const sizes = safeRows.map((row) => row.size);
-    const allTimesUs = safeRows.flatMap((row) => [
-      Math.max(0.001, row.basic_time_ns / 1000),
-      Math.max(0.001, row.neon_time_ns / 1000)
+    const allTimesMs = safeRows.flatMap((row) => [
+      Math.max(0.001, row.basic_time_ns / 1_000_000),
+      Math.max(0.001, row.neon_time_ns / 1_000_000)
     ]);
 
     const minSize = Math.min(...sizes);
@@ -144,9 +143,9 @@ function App() {
     const zeroGap = minSize <= 0 && positiveSizes.length ? 46 : 0;
     const positivePlotX = margin.left + zeroGap;
     const positivePlotW = Math.max(plotW - zeroGap, 1);
-    const minTimeUs = 0;
-    const maxTimeUs = Math.max(...allTimesUs);
-    const yTop = Math.max(maxTimeUs * 1.12, 1);
+    const minTimeMs = 0;
+    const maxTimeMs = Math.max(...allTimesMs);
+    const yTop = Math.max(maxTimeMs * 1.12, 1);
 
     const scaleX = (size) => {
       if (size <= 0) return margin.left;
@@ -156,8 +155,8 @@ function App() {
     };
 
     const scaleY = (timeNs) => {
-      const valueUs = Math.max(0.001, timeNs / 1000);
-      const t = (valueUs - minTimeUs) / Math.max(yTop - minTimeUs, 1e-9);
+      const valueMs = Math.max(0.001, timeNs / 1_000_000);
+      const t = (valueMs - minTimeMs) / Math.max(yTop - minTimeMs, 1e-9);
       return margin.top + (1 - t) * plotH;
     };
 
@@ -167,10 +166,10 @@ function App() {
         .join(" ");
 
     const yTicks = Array.from({ length: 6 }, (_, i) => {
-      const value = minTimeUs + ((yTop - minTimeUs) * i) / 5;
+      const value = minTimeMs + ((yTop - minTimeMs) * i) / 5;
       return {
         value,
-        y: scaleY(value * 1000)
+        y: scaleY(value * 1_000_000)
       };
     });
 
@@ -231,7 +230,7 @@ function App() {
             Upload JSON report
             <input type="file" accept="application/json" onChange={onUpload} />
           </label>
-          <span className="pill">Metric: average time per call (µs)</span>
+          <span className="pill">Metric: average time per call (ms)</span>
           <span className="pill">NEON: {data ? (data.neon_enabled ? "enabled" : "fallback/scalar") : "unknown"}</span>
         </div>
       </section>
@@ -265,7 +264,7 @@ function App() {
               <div className="chart-head">
                 <div>
                   <h2>Time Curve: NEON + BASIC</h2>
-                  <p>Log-scale X and linear Y, Y axis in µs.</p>
+                  <p>Log-scale X and linear Y, Y axis in ms.</p>
                 </div>
                 <div className="legend">
                   <span className="legend-item neon">NEON</span>
@@ -309,7 +308,7 @@ function App() {
                         className="grid-line"
                       />
                       <text x={chart.margin.left - 14} y={tick.y + 4} className="axis-label y-label">
-                        {formatUsLabel(tick.value)}
+                        {formatMsLabel(tick.value)}
                       </text>
                     </g>
                   ))}
@@ -378,9 +377,9 @@ function App() {
                   <span>
                     Size {formatInt(chart.rows[hoveredIndex].size)}:
                     {" "}
-                    BASIC {formatUsFromNs(chart.rows[hoveredIndex].basic_time_ns)} µs
+                    BASIC {formatMsFromNs(chart.rows[hoveredIndex].basic_time_ns)} ms
                     {" • "}
-                    NEON {formatUsFromNs(chart.rows[hoveredIndex].neon_time_ns)} µs
+                    NEON {formatMsFromNs(chart.rows[hoveredIndex].neon_time_ns)} ms
                     {" • "}
                     Speedup {formatFloat(chart.rows[hoveredIndex].speedup)}x
                   </span>
@@ -399,8 +398,8 @@ function App() {
                 <thead>
                   <tr>
                     <th>Array Size</th>
-                    <th>Basic (µs)</th>
-                    <th>NEON (µs)</th>
+                    <th>Basic (ms)</th>
+                    <th>NEON (ms)</th>
                     <th>Speedup</th>
                     <th>Repeats</th>
                     <th>Verdict</th>
@@ -413,8 +412,8 @@ function App() {
                     return (
                       <tr key={`${row.size}-${index}`}>
                         <td className="num">{formatInt(row.size)}</td>
-                        <td className="num">{formatUsFromNs(row.basic_time_ns)}</td>
-                        <td className="num">{formatUsFromNs(row.neon_time_ns)}</td>
+                        <td className="num">{formatMsFromNs(row.basic_time_ns)}</td>
+                        <td className="num">{formatMsFromNs(row.neon_time_ns)}</td>
                         <td className={`num speedup ${cls}`}>{formatFloat(row.speedup)}x</td>
                         <td className="num">{formatInt(row.repetitions)}</td>
                         <td className={`verdict ${cls}`}>{verdictText(row.speedup)}</td>
