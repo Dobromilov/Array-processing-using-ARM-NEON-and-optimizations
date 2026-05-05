@@ -136,23 +136,28 @@ function App() {
 
     const minSize = Math.min(...sizes);
     const maxSize = Math.max(...sizes);
-    const sizeRange = Math.max(maxSize - minSize, 1);
-    const minTimeUs = Math.max(0.001, Math.min(...allTimesUs));
+    const positiveSizes = sizes.filter((size) => size > 0);
+    const minPositiveSize = positiveSizes.length ? Math.min(...positiveSizes) : 1;
+    const positiveMaxSize = Math.max(maxSize, minPositiveSize);
+    const minXLog = Math.log10(minPositiveSize);
+    const maxXLog = Math.log10(positiveMaxSize);
+    const zeroGap = minSize <= 0 && positiveSizes.length ? 46 : 0;
+    const positivePlotX = margin.left + zeroGap;
+    const positivePlotW = Math.max(plotW - zeroGap, 1);
+    const minTimeUs = 0;
     const maxTimeUs = Math.max(...allTimesUs);
-    const yBottom = minTimeUs * 0.8;
-    const yTop = maxTimeUs * 1.12;
-    const minYLog = Math.log10(yBottom);
-    const maxYLog = Math.log10(yTop);
+    const yTop = Math.max(maxTimeUs * 1.12, 1);
 
     const scaleX = (size) => {
-      if (minSize === maxSize) return margin.left + plotW / 2;
-      const t = (size - minSize) / sizeRange;
-      return margin.left + t * plotW;
+      if (size <= 0) return margin.left;
+      if (!positiveSizes.length || minXLog === maxXLog) return positivePlotX + positivePlotW / 2;
+      const t = (Math.log10(size) - minXLog) / Math.max(maxXLog - minXLog, 1e-9);
+      return positivePlotX + t * positivePlotW;
     };
 
     const scaleY = (timeNs) => {
       const valueUs = Math.max(0.001, timeNs / 1000);
-      const t = (Math.log10(valueUs) - minYLog) / Math.max(maxYLog - minYLog, 1e-9);
+      const t = (valueUs - minTimeUs) / Math.max(yTop - minTimeUs, 1e-9);
       return margin.top + (1 - t) * plotH;
     };
 
@@ -162,21 +167,27 @@ function App() {
         .join(" ");
 
     const yTicks = Array.from({ length: 6 }, (_, i) => {
-      const exponent = minYLog + ((maxYLog - minYLog) * i) / 5;
-      const value = 10 ** exponent;
+      const value = minTimeUs + ((yTop - minTimeUs) * i) / 5;
       return {
         value,
         y: scaleY(value * 1000)
       };
     });
 
-    const xTicks = Array.from({ length: 6 }, (_, i) => {
-      const value = minSize + (sizeRange * i) / 5;
-      return {
-        value,
-        x: scaleX(value)
-      };
-    });
+    const xTickValues = [];
+    if (minSize <= 0) xTickValues.push(0);
+
+    let tick = 1;
+    while (tick < minPositiveSize) tick *= 10;
+    while (tick <= maxSize) {
+      xTickValues.push(tick);
+      tick *= 10;
+    }
+
+    const xTicks = xTickValues.map((value) => ({
+      value,
+      x: scaleX(value)
+    }));
 
     return {
       rows: safeRows,
@@ -254,7 +265,7 @@ function App() {
               <div className="chart-head">
                 <div>
                   <h2>Time Curve: NEON + BASIC</h2>
-                  <p>Linear X and log-scale Y, Y axis in µs.</p>
+                  <p>Log-scale X and linear Y, Y axis in µs.</p>
                 </div>
                 <div className="legend">
                   <span className="legend-item neon">NEON</span>
