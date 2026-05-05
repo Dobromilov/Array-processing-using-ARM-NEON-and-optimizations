@@ -1,0 +1,233 @@
+Index: CMakeLists.txt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>cmake_minimum_required(VERSION 3.16)\r\n\r\nproject(array_processing_arm_neon LANGUAGES CXX)\r\n\r\nset(CMAKE_CXX_STANDARD 17)\r\nset(CMAKE_CXX_STANDARD_REQUIRED ON)\r\nset(CMAKE_CXX_EXTENSIONS OFF)\r\n\r\noption(BUILD_SHARED_ARRAY_PROCESSING \"Build shared library target\" ON)\r\n\r\nadd_library(array_processing_static STATIC src/array_sum.cpp)\r\nset_target_properties(array_processing_static PROPERTIES OUTPUT_NAME array_processing)\r\ntarget_include_directories(array_processing_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)\r\ntarget_compile_options(array_processing_static PRIVATE -O3 -Wall -Wextra -Wpedantic)\r\n\r\nif(BUILD_SHARED_ARRAY_PROCESSING)\r\n    add_library(array_processing_shared SHARED src/array_sum.cpp)\r\n    set_target_properties(array_processing_shared PROPERTIES OUTPUT_NAME array_processing)\r\n    target_include_directories(array_processing_shared PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)\r\n    target_compile_options(array_processing_shared PRIVATE -O3 -Wall -Wextra -Wpedantic)\r\nendif()\r\n\r\nif(CMAKE_SYSTEM_PROCESSOR MATCHES \"arm\" AND CMAKE_CXX_COMPILER_ID STREQUAL \"GNU\")\r\n    target_compile_options(array_processing_static PRIVATE -mfpu=neon -mfloat-abi=hard)\r\n    if(TARGET array_processing_shared)\r\n        target_compile_options(array_processing_shared PRIVATE -mfpu=neon -mfloat-abi=hard)\r\n    endif()\r\nendif()\r\n\r\nadd_executable(go src/main.cpp)\r\ntarget_link_libraries(go PRIVATE array_processing_static)\r\n\r\n# Keep executable at project root for qemu-arm command:\r\n# qemu-arm -L /usr/arm-linux-gnueabihf ./go\r\nset_target_properties(go PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt	(revision 04a10cdfc0a6a1a61d34fcd1e46b62f8522853a9)
++++ b/CMakeLists.txt	(date 1777809784548)
+@@ -1,35 +1,40 @@
+ cmake_minimum_required(VERSION 3.16)
+-
+ project(array_processing_arm_neon LANGUAGES CXX)
+ 
+ set(CMAKE_CXX_STANDARD 17)
+-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+-set(CMAKE_CXX_EXTENSIONS OFF)
+ 
+-option(BUILD_SHARED_ARRAY_PROCESSING "Build shared library target" ON)
++# --- Настройка ImGui и ImPlot ---
++# Укажи путь к папкам, куда ты их скачал
++set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui)
++set(IMPLOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/implot)
++
++# Список файлов для компиляции GUI
++set(GUI_SOURCES
++        ${IMGUI_DIR}/imgui.cpp
++        ${IMGUI_DIR}/imgui_draw.cpp
++        ${IMGUI_DIR}/imgui_tables.cpp
++        ${IMGUI_DIR}/imgui_widgets.cpp
++        ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
++        ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
++        ${IMPLOT_DIR}/implot.cpp
++        ${IMPLOT_DIR}/implot_items.cpp
++)
+ 
+ add_library(array_processing_static STATIC src/array_sum.cpp)
+-set_target_properties(array_processing_static PROPERTIES OUTPUT_NAME array_processing)
+ target_include_directories(array_processing_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+-target_compile_options(array_processing_static PRIVATE -O3 -Wall -Wextra -Wpedantic)
+ 
+-if(BUILD_SHARED_ARRAY_PROCESSING)
+-    add_library(array_processing_shared SHARED src/array_sum.cpp)
+-    set_target_properties(array_processing_shared PROPERTIES OUTPUT_NAME array_processing)
+-    target_include_directories(array_processing_shared PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+-    target_compile_options(array_processing_shared PRIVATE -O3 -Wall -Wextra -Wpedantic)
+-endif()
++# --- Основной исполняемый файл ---
++add_executable(go src/main.cpp ${GUI_SOURCES})
+ 
+-if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+-    target_compile_options(array_processing_static PRIVATE -mfpu=neon -mfloat-abi=hard)
+-    if(TARGET array_processing_shared)
+-        target_compile_options(array_processing_shared PRIVATE -mfpu=neon -mfloat-abi=hard)
+-    endif()
+-endif()
++# Добавляем пути к заголовкам
++target_include_directories(go PRIVATE
++        ${IMGUI_DIR}
++        ${IMGUI_DIR}/backends
++        ${IMPLOT_DIR}
++)
+ 
+-add_executable(go src/main.cpp)
+-target_link_libraries(go PRIVATE array_processing_static)
++# Нужны библиотеки для окна (GLFW и OpenGL)
++find_package(glfw3 REQUIRED)
++find_package(OpenGL REQUIRED)
+ 
+-# Keep executable at project root for qemu-arm command:
+-# qemu-arm -L /usr/arm-linux-gnueabihf ./go
+-set_target_properties(go PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
++target_link_libraries(go PRIVATE array_processing_static glfw OpenGL::GL)
+\ No newline at end of file
+Index: src/main.cpp
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>#include \"array_sum.h\"\r\n\r\n#include <chrono>\r\n#include <cstdint>\r\n#include <iostream>\r\n#include <random>\r\n#include <vector>\r\n#include <iomanip>\r\n\r\nint main() {\r\n    std::vector<int> sizes = {10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000};\r\n\r\n    std::random_device rd;\r\n    std::mt19937 gen(rd());\r\n    std::uniform_int_distribution<int32_t> dis(-100, 100);\r\n\r\n    std::cout << \"\\n==========================================================================================================================\\n\";\r\n    std::cout << \"| Размер массива |    Базовая сумма   |    NEON сумма      | Базовая время (мкс)  | NEON время (мкс)   | Ускорение (раз) |\\n\";\r\n    std::cout << \"==========================================================================================================================\\n\";\r\n\r\n    for (int size : sizes) {\r\n        std::vector<int32_t> v(size);\r\n\r\n        for (int32_t& num : v) {\r\n            num = dis(gen);\r\n        }\r\n\r\n        auto start_basic = std::chrono::high_resolution_clock::now();\r\n        int64_t sum_basic_func = sum_array_basic(v);\r\n        auto end_basic = std::chrono::high_resolution_clock::now();\r\n        auto duration_basic = std::chrono::duration_cast<std::chrono::nanoseconds>(end_basic - start_basic);\r\n        double time_basic_us = duration_basic.count() / 1000.0; // микросекунды\r\n\r\n        auto start_neon = std::chrono::high_resolution_clock::now();\r\n        int64_t sum_neon_func = sum_array_neon(v);\r\n        auto end_neon = std::chrono::high_resolution_clock::now();\r\n        auto duration_neon = std::chrono::duration_cast<std::chrono::nanoseconds>(end_neon - start_neon);\r\n        double time_neon_us = duration_neon.count() / 1000.0; // микросекунды\r\n\r\n        if (sum_basic_func != sum_neon_func) {\r\n            std::cerr << \"Ошибка: суммы не совпадают для размера \" << size << \"!\\n\";\r\n            return 1;\r\n        }\r\n\r\n        double speedup = time_basic_us / time_neon_us;\r\n\r\n        std::cout << \"| \" << std::setw(14) << size\r\n                  << \" | \" << std::setw(18) << sum_basic_func\r\n                  << \" | \" << std::setw(18) << sum_neon_func\r\n                  << \" | \" << std::setw(20) << std::fixed << std::setprecision(2) << time_basic_us\r\n                  << \" | \" << std::setw(18) << std::fixed << std::setprecision(2) << time_neon_us\r\n                  << \" | \" << std::setw(14) << std::fixed << std::setprecision(2) << speedup << \"x |\\n\";\r\n\r\n        std::cout << \"--------------------------------------------------------------------------------------------------------------------------\\n\";\r\n    }\r\n\r\n    return 0;\r\n}
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main.cpp b/src/main.cpp
+--- a/src/main.cpp	(revision 04a10cdfc0a6a1a61d34fcd1e46b62f8522853a9)
++++ b/src/main.cpp	(date 1777809728587)
+@@ -1,58 +1,110 @@
+-#include "array_sum.h"
+-
++#include <vector>
+ #include <chrono>
+-#include <cstdint>
+-#include <iostream>
+ #include <random>
+-#include <vector>
+ #include <iomanip>
++#include <string>
++
++// ImGui & ImPlot
++#include "imgui.h"
++#include "implot.h"
++#include "imgui_impl_glfw.h"
++#include "imgui_impl_opengl3.h"
+ 
+-int main() {
++// Ваша логика
++#include "array_sum.h"
++
++struct BenchmarkResult {
++    int size;
++    double time_basic;
++    double time_neon;
++    double speedup;
++};
++
++// Функция проведения тестов
++std::vector<BenchmarkResult> run_benchmarks() {
+     std::vector<int> sizes = {10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000};
++    std::vector<BenchmarkResult> results;
+ 
+     std::random_device rd;
+     std::mt19937 gen(rd());
+     std::uniform_int_distribution<int32_t> dis(-100, 100);
+ 
+-    std::cout << "\n==========================================================================================================================\n";
+-    std::cout << "| Размер массива |    Базовая сумма   |    NEON сумма      | Базовая время (мкс)  | NEON время (мкс)   | Ускорение (раз) |\n";
+-    std::cout << "==========================================================================================================================\n";
+-
+     for (int size : sizes) {
+         std::vector<int32_t> v(size);
++        for (int32_t& num : v) num = dis(gen);
++
++        // Basic
++        auto s1 = std::chrono::high_resolution_clock::now();
++        sum_array_basic(v);
++        auto e1 = std::chrono::high_resolution_clock::now();
++        double t_basic = std::chrono::duration<double, std::micro>(e1 - s1).count();
++
++        // NEON
++        auto s2 = std::chrono::high_resolution_clock::now();
++        sum_array_neon(v);
++        auto e2 = std::chrono::high_resolution_clock::now();
++        double t_neon = std::chrono::duration<double, std::micro>(e2 - s2).count();
++
++        results.push_back({size, t_basic, t_neon, t_basic / t_neon});
++    }
++    return results;
++}
++
++void RenderUI(std::vector<BenchmarkResult>& results) {
++    ImGui::Begin("NEON vs Basic Benchmark");
+ 
+-        for (int32_t& num : v) {
+-            num = dis(gen);
+-        }
++    if (ImGui::Button("Запустить тест", ImVec2(200, 40))) {
++        results = run_benchmarks();
++    }
+ 
+-        auto start_basic = std::chrono::high_resolution_clock::now();
+-        int64_t sum_basic_func = sum_array_basic(v);
+-        auto end_basic = std::chrono::high_resolution_clock::now();
+-        auto duration_basic = std::chrono::duration_cast<std::chrono::nanoseconds>(end_basic - start_basic);
+-        double time_basic_us = duration_basic.count() / 1000.0; // микросекунды
++    ImGui::Separator();
++
++    if (results.empty()) {
++        ImGui::Text("Нажмите кнопку выше, чтобы получить данные.");
++        ImGui::End();
++        return;
++    }
+ 
+-        auto start_neon = std::chrono::high_resolution_clock::now();
+-        int64_t sum_neon_func = sum_array_neon(v);
+-        auto end_neon = std::chrono::high_resolution_clock::now();
+-        auto duration_neon = std::chrono::duration_cast<std::chrono::nanoseconds>(end_neon - start_neon);
+-        double time_neon_us = duration_neon.count() / 1000.0; // микросекунды
++    // --- Таблица ---
++    if (ImGui::BeginTable("results_table", 5, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable)) {
++        ImGui::TableSetupColumn("Размер");
++        ImGui::TableSetupColumn("Базовое (мкс)");
++        ImGui::TableSetupColumn("NEON (мкс)");
++        ImGui::TableSetupColumn("Ускорение");
++        ImGui::TableSetupColumn("Статус");
++        ImGui::TableHeadersRow();
+ 
+-        if (sum_basic_func != sum_neon_func) {
+-            std::cerr << "Ошибка: суммы не совпадают для размера " << size << "!\n";
+-            return 1;
++        for (const auto& res : results) {
++            ImGui::TableNextRow();
++            ImGui::TableSetColumnIndex(0); ImGui::Text("%d", res.size);
++            ImGui::TableSetColumnIndex(1); ImGui::Text("%.2f", res.time_basic);
++            ImGui::TableSetColumnIndex(2); ImGui::Text("%.2f", res.time_neon);
++            ImGui::TableSetColumnIndex(3);
++            ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "%.2fx", res.speedup);
++            ImGui::TableSetColumnIndex(4); ImGui::Text("OK");
+         }
++        ImGui::EndTable();
++    }
+ 
+-        double speedup = time_basic_us / time_neon_us;
++    ImGui::Spacer();
+ 
+-        std::cout << "| " << std::setw(14) << size
+-                  << " | " << std::setw(18) << sum_basic_func
+-                  << " | " << std::setw(18) << sum_neon_func
+-                  << " | " << std::setw(20) << std::fixed << std::setprecision(2) << time_basic_us
+-                  << " | " << std::setw(18) << std::fixed << std::setprecision(2) << time_neon_us
+-                  << " | " << std::setw(14) << std::fixed << std::setprecision(2) << speedup << "x |\n";
++    // --- График ---
++    if (ImPlot::BeginPlot("Сравнение производительности", ImVec2(-1, 400))) {
++        // Настраиваем логарифмическую шкалу для X (так как размеры растут в 10 раз)
++        ImPlot::SetupAxes("Размер массива (log10)", "Время (мкс)", ImPlotAxisFlags_LogScale, ImPlotAxisFlags_None);
+ 
+-        std::cout << "--------------------------------------------------------------------------------------------------------------------------\n";
+-    }
++        std::vector<double> x, y_basic, y_neon;
++        for(auto& r : results) {
++            x.push_back((double)r.size);
++            y_basic.push_back(r.time_basic);
++            y_neon.push_back(r.time_neon);
++        }
+ 
+-    return 0;
++        ImPlot::PlotLine("Basic Loop", x.data(), y_basic.data(), (int)x.size());
++        ImPlot::PlotLine("NEON SIMD", x.data(), y_neon.data(), (int)x.size());
++
++        ImPlot::EndPlot();
++    }
++
++    ImGui::End();
+ }
+\ No newline at end of file

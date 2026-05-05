@@ -1,0 +1,245 @@
+Index: README.md
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+># Array-processing-using-ARM-NEON-and-optimizations\r\n\r\n---\r\n\r\nЦель: освоить возможности ARM-архитектуры на языке C++ с помощью NEON-\r\nинтринсиков, условных операций без ветвлений и баррельного шифтера. Написать\r\nвекторную реализацию функции, которая вычисляет сумму модифицированных элементов\r\nмассива, максимально используя аппаратные особенности ARM.\r\n\r\n## Установка необходимых пакетов\r\n\r\n```bash\r\nsudo apt update\r\nsudo apt install g++-arm-linux-gnueabihf gcc-arm-linux-gnueabihf\r\nsudo apt install qemu-user\r\n```\r\n\r\n## Сборка и запуск (ARM через QEMU)\r\n\r\nПроект собирается кросс-компилятором `arm-linux-gnueabihf-g++`, исполняемый файл\r\nсоздаётся в корне проекта как `go`.\r\n\r\n```bash\r\nmake build\r\nmake run\r\n```\r\n\r\n`make run` выполняет:\r\n\r\n```bash\r\nqemu-arm -L /usr/arm-linux-gnueabihf ./go\r\n```\r\n\r\n## Что собирается\r\n\r\n- `libarray_processing.a` (статическая библиотека)\r\n- `libarray_processing.so` (динамическая библиотека)\r\n- `go` (исполняемый файл)\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/README.md b/README.md
+--- a/README.md	(revision 04a10cdfc0a6a1a61d34fcd1e46b62f8522853a9)
++++ b/README.md	(date 1777385889322)
+@@ -1,38 +1,64 @@
+ # Array-processing-using-ARM-NEON-and-optimizations
+ 
+----
+-
+-Цель: освоить возможности ARM-архитектуры на языке C++ с помощью NEON-
+-интринсиков, условных операций без ветвлений и баррельного шифтера. Написать
+-векторную реализацию функции, которая вычисляет сумму модифицированных элементов
+-массива, максимально используя аппаратные особенности ARM.
++Цель: сравнить базовую реализацию обработки массива и реализацию с использованием ARM NEON.
+ 
+-## Установка необходимых пакетов
++Сейчас проект запускается как desktop GUI: внутри окна есть сводка, таблица результатов и графики производительности.
+ 
+-```bash
+-sudo apt update
+-sudo apt install g++-arm-linux-gnueabihf gcc-arm-linux-gnueabihf
+-sudo apt install qemu-user
+-```
++## Быстрый запуск
+ 
+-## Сборка и запуск (ARM через QEMU)
+-
+-Проект собирается кросс-компилятором `arm-linux-gnueabihf-g++`, исполняемый файл
+-создаётся в корне проекта как `go`.
++Сборка:
+ 
+ ```bash
+ make build
++```
++
++Запуск:
++
++```bash
+ make run
+ ```
+ 
+-`make run` выполняет:
++`make run` автоматически собирает проект и запускает:
++
++```bash
++./build-host/neon_benchmark
++```
++
++## Что нужно для GUI
++
++- `cmake` 3.16+
++- компилятор C++ с поддержкой C++17
++- OpenGL
++- зависимости в `vendors/`:
++  - `vendors/imgui`
++  - `vendors/implot`
++  - `vendors/glfw`
++
++## Сборка и запуск без Makefile
++
++```bash
++cmake -S . -B build-host -DCMAKE_BUILD_TYPE=Release
++cmake --build build-host --parallel
++./build-host/neon_benchmark
++```
++
++## ARM и QEMU
++
++Для ARM-конфигурации оставлены отдельные команды:
++
++```bash
++make arm-build
++```
++
++Сейчас GUI-цель не настроена на запуск через старый сценарий вида:
+ 
+ ```bash
+ qemu-arm -L /usr/arm-linux-gnueabihf ./go
+ ```
+ 
++Причина простая: текущий проект уже не консольный `go`, а графическое приложение `neon_benchmark`.
++
+ ## Что собирается
+ 
+-- `libarray_processing.a` (статическая библиотека)
+-- `libarray_processing.so` (динамическая библиотека)
+-- `go` (исполняемый файл)
++- `libarray_processing.a`
++- `neon_benchmark`
+Index: CMakeLists.txt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>cmake_minimum_required(VERSION 3.16)\r\n\r\nproject(array_processing_arm_neon LANGUAGES CXX)\r\n\r\nset(CMAKE_CXX_STANDARD 17)\r\nset(CMAKE_CXX_STANDARD_REQUIRED ON)\r\nset(CMAKE_CXX_EXTENSIONS OFF)\r\n\r\noption(BUILD_SHARED_ARRAY_PROCESSING \"Build shared library target\" ON)\r\n\r\nadd_library(array_processing_static STATIC src/array_sum.cpp)\r\nset_target_properties(array_processing_static PROPERTIES OUTPUT_NAME array_processing)\r\ntarget_include_directories(array_processing_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)\r\ntarget_compile_options(array_processing_static PRIVATE -O3 -Wall -Wextra -Wpedantic)\r\n\r\nif(BUILD_SHARED_ARRAY_PROCESSING)\r\n    add_library(array_processing_shared SHARED src/array_sum.cpp)\r\n    set_target_properties(array_processing_shared PROPERTIES OUTPUT_NAME array_processing)\r\n    target_include_directories(array_processing_shared PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)\r\n    target_compile_options(array_processing_shared PRIVATE -O3 -Wall -Wextra -Wpedantic)\r\nendif()\r\n\r\nif(CMAKE_SYSTEM_PROCESSOR MATCHES \"arm\" AND CMAKE_CXX_COMPILER_ID STREQUAL \"GNU\")\r\n    target_compile_options(array_processing_static PRIVATE -mfpu=neon -mfloat-abi=hard)\r\n    if(TARGET array_processing_shared)\r\n        target_compile_options(array_processing_shared PRIVATE -mfpu=neon -mfloat-abi=hard)\r\n    endif()\r\nendif()\r\n\r\nadd_executable(go src/main.cpp)\r\ntarget_link_libraries(go PRIVATE array_processing_static)\r\n\r\n# Keep executable at project root for qemu-arm command:\r\n# qemu-arm -L /usr/arm-linux-gnueabihf ./go\r\nset_target_properties(go PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt	(revision 04a10cdfc0a6a1a61d34fcd1e46b62f8522853a9)
++++ b/CMakeLists.txt	(date 1777383145560)
+@@ -1,35 +1,47 @@
+ cmake_minimum_required(VERSION 3.16)
+-
+-project(array_processing_arm_neon LANGUAGES CXX)
++project(neon_benchmark)
+ 
+ set(CMAKE_CXX_STANDARD 17)
+ set(CMAKE_CXX_STANDARD_REQUIRED ON)
+-set(CMAKE_CXX_EXTENSIONS OFF)
+ 
+-option(BUILD_SHARED_ARRAY_PROCESSING "Build shared library target" ON)
++add_library(array_processing STATIC src/array_sum.cpp)
++target_include_directories(array_processing PUBLIC src)
+ 
+-add_library(array_processing_static STATIC src/array_sum.cpp)
+-set_target_properties(array_processing_static PROPERTIES OUTPUT_NAME array_processing)
+-target_include_directories(array_processing_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+-target_compile_options(array_processing_static PRIVATE -O3 -Wall -Wextra -Wpedantic)
+-
+-if(BUILD_SHARED_ARRAY_PROCESSING)
+-    add_library(array_processing_shared SHARED src/array_sum.cpp)
+-    set_target_properties(array_processing_shared PROPERTIES OUTPUT_NAME array_processing)
+-    target_include_directories(array_processing_shared PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+-    target_compile_options(array_processing_shared PRIVATE -O3 -Wall -Wextra -Wpedantic)
++if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64")
++    target_compile_options(array_processing PRIVATE -march=armv8-a+simd)
++    target_compile_definitions(array_processing PRIVATE __ARM_NEON)
+ endif()
+ 
+-if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+-    target_compile_options(array_processing_static PRIVATE -mfpu=neon -mfloat-abi=hard)
+-    if(TARGET array_processing_shared)
+-        target_compile_options(array_processing_shared PRIVATE -mfpu=neon -mfloat-abi=hard)
+-    endif()
++if(
++    EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendors/imgui/imgui.cpp" AND
++    EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendors/implot/implot.cpp" AND
++    EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendors/glfw/CMakeLists.txt"
++)
++    add_library(imgui STATIC
++            vendors/imgui/imgui.cpp
++            vendors/imgui/imgui_draw.cpp
++            vendors/imgui/imgui_tables.cpp
++            vendors/imgui/imgui_widgets.cpp
++            vendors/imgui/backends/imgui_impl_glfw.cpp
++            vendors/imgui/backends/imgui_impl_opengl3.cpp
++    )
++    target_include_directories(imgui PUBLIC
++            vendors/imgui
++            vendors/imgui/backends
++            vendors/glfw/include
++    )
++
++    add_library(implot STATIC
++            vendors/implot/implot.cpp
++            vendors/implot/implot_items.cpp
++    )
++    target_include_directories(implot PUBLIC vendors/implot vendors/imgui)
++
++    find_package(OpenGL REQUIRED)
++    add_subdirectory(vendors/glfw)
++
++    add_executable(neon_benchmark src/main.cpp)
++    target_link_libraries(neon_benchmark PRIVATE array_processing imgui implot glfw OpenGL::GL)
++else()
++    message(WARNING "GUI dependencies were not found in vendors/. Add imgui, implot and glfw there to build the desktop interface.")
+ endif()
+-
+-add_executable(go src/main.cpp)
+-target_link_libraries(go PRIVATE array_processing_static)
+-
+-# Keep executable at project root for qemu-arm command:
+-# qemu-arm -L /usr/arm-linux-gnueabihf ./go
+-set_target_properties(go PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
+Index: Makefile
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>CMAKE ?= cmake\r\nBUILD_DIR ?= build-arm\r\nHOST_BUILD_DIR ?= build-host\r\nBUILD_TYPE ?= Release\r\nTOOLCHAIN_FILE ?= cmake/toolchains/armhf.cmake\r\nQEMU_SYSROOT ?= /usr/arm-linux-gnueabihf\r\n\r\n.PHONY: all configure build run host-configure host-build host-run clean rebuild\r\n\r\nall: build\r\n\r\nconfigure:\r\n\tif [ -f $(BUILD_DIR)/CMakeCache.txt ]; then \\\r\n\t\t$(CMAKE) -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE); \\\r\n\telse \\\r\n\t\t$(CMAKE) -S . -B $(BUILD_DIR) \\\r\n\t\t\t-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \\\r\n\t\t\t-DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN_FILE); \\\r\n\tfi\r\n\r\nbuild: configure\r\n\t$(CMAKE) --build $(BUILD_DIR) --parallel\r\n\r\nrun: build\r\n\tqemu-arm -L $(QEMU_SYSROOT) ./go\r\n\r\nhost-configure:\r\n\t$(CMAKE) -S . -B $(HOST_BUILD_DIR) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)\r\n\r\nhost-build: host-configure\r\n\t$(CMAKE) --build $(HOST_BUILD_DIR) --parallel\r\n\r\nhost-run: host-build\r\n\t./go\r\n\r\nclean:\r\n\trm -rf $(BUILD_DIR) $(HOST_BUILD_DIR) go\r\n\r\nrebuild: clean build\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/Makefile b/Makefile
+--- a/Makefile	(revision 04a10cdfc0a6a1a61d34fcd1e46b62f8522853a9)
++++ b/Makefile	(date 1777385877904)
+@@ -1,39 +1,37 @@
+ CMAKE ?= cmake
+-BUILD_DIR ?= build-arm
+-HOST_BUILD_DIR ?= build-host
++BUILD_DIR ?= build-host
++ARM_BUILD_DIR ?= build-arm
+ BUILD_TYPE ?= Release
+ TOOLCHAIN_FILE ?= cmake/toolchains/armhf.cmake
+ QEMU_SYSROOT ?= /usr/arm-linux-gnueabihf
++GUI_EXE ?= ./$(BUILD_DIR)/neon_benchmark
+ 
+-.PHONY: all configure build run host-configure host-build host-run clean rebuild
++.PHONY: all configure build run arm-configure arm-build arm-run clean rebuild
+ 
+ all: build
+ 
+ configure:
+-	if [ -f $(BUILD_DIR)/CMakeCache.txt ]; then \
+-		$(CMAKE) -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE); \
+-	else \
+-		$(CMAKE) -S . -B $(BUILD_DIR) \
+-			-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+-			-DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN_FILE); \
+-	fi
++	$(CMAKE) -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)
+ 
+ build: configure
+ 	$(CMAKE) --build $(BUILD_DIR) --parallel
+ 
+ run: build
+-	qemu-arm -L $(QEMU_SYSROOT) ./go
++	$(GUI_EXE)
+ 
+-host-configure:
+-	$(CMAKE) -S . -B $(HOST_BUILD_DIR) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)
++arm-configure:
++	$(CMAKE) -S . -B $(ARM_BUILD_DIR) \
++		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
++		-DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN_FILE)
+ 
+-host-build: host-configure
+-	$(CMAKE) --build $(HOST_BUILD_DIR) --parallel
++arm-build: arm-configure
++	$(CMAKE) --build $(ARM_BUILD_DIR) --parallel
+ 
+-host-run: host-build
+-	./go
++arm-run: arm-build
++	@echo "ARM/QEMU run is not configured for the GUI target."
++	@echo "Use 'make run' for the desktop app, or add a separate console ARM target first."
+ 
+ clean:
+-	rm -rf $(BUILD_DIR) $(HOST_BUILD_DIR) go
++	rm -rf $(BUILD_DIR) $(ARM_BUILD_DIR)
+ 
+ rebuild: clean build

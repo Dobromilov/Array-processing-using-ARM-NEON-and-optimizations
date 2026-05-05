@@ -1,0 +1,554 @@
+Index: src/main.cpp
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>#include \"array_sum.h\"\r\n\r\n#include <chrono>\r\n#include <cstdint>\r\n#include <iostream>\r\n#include <random>\r\n#include <vector>\r\n#include <iomanip>\r\n\r\nint main() {\r\n    std::vector<int> sizes = {10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000};\r\n\r\n    std::random_device rd;\r\n    std::mt19937 gen(rd());\r\n    std::uniform_int_distribution<int32_t> dis(-100, 100);\r\n\r\n    std::cout << \"\\n==========================================================================================================================\\n\";\r\n    std::cout << \"| Размер массива |    Базовая сумма   |    NEON сумма      | Базовая время (мкс)  | NEON время (мкс)   | Ускорение (раз) |\\n\";\r\n    std::cout << \"==========================================================================================================================\\n\";\r\n\r\n    for (int size : sizes) {\r\n        std::vector<int32_t> v(size);\r\n\r\n        for (int32_t& num : v) {\r\n            num = dis(gen);\r\n        }\r\n\r\n        auto start_basic = std::chrono::high_resolution_clock::now();\r\n        int64_t sum_basic_func = sum_array_basic(v);\r\n        auto end_basic = std::chrono::high_resolution_clock::now();\r\n        auto duration_basic = std::chrono::duration_cast<std::chrono::nanoseconds>(end_basic - start_basic);\r\n        double time_basic_us = duration_basic.count() / 1000.0; // микросекунды\r\n\r\n        auto start_neon = std::chrono::high_resolution_clock::now();\r\n        int64_t sum_neon_func = sum_array_neon(v);\r\n        auto end_neon = std::chrono::high_resolution_clock::now();\r\n        auto duration_neon = std::chrono::duration_cast<std::chrono::nanoseconds>(end_neon - start_neon);\r\n        double time_neon_us = duration_neon.count() / 1000.0; // микросекунды\r\n\r\n        if (sum_basic_func != sum_neon_func) {\r\n            std::cerr << \"Ошибка: суммы не совпадают для размера \" << size << \"!\\n\";\r\n            return 1;\r\n        }\r\n\r\n        double speedup = time_basic_us / time_neon_us;\r\n\r\n        std::cout << \"| \" << std::setw(14) << size\r\n                  << \" | \" << std::setw(18) << sum_basic_func\r\n                  << \" | \" << std::setw(18) << sum_neon_func\r\n                  << \" | \" << std::setw(20) << std::fixed << std::setprecision(2) << time_basic_us\r\n                  << \" | \" << std::setw(18) << std::fixed << std::setprecision(2) << time_neon_us\r\n                  << \" | \" << std::setw(14) << std::fixed << std::setprecision(2) << speedup << \"x |\\n\";\r\n\r\n        std::cout << \"--------------------------------------------------------------------------------------------------------------------------\\n\";\r\n    }\r\n\r\n    return 0;\r\n}
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main.cpp b/src/main.cpp
+--- a/src/main.cpp	(revision 04a10cdfc0a6a1a61d34fcd1e46b62f8522853a9)
++++ b/src/main.cpp	(date 1777385695176)
+@@ -1,58 +1,507 @@
+ #include "array_sum.h"
+ 
++#include <algorithm>
++#include <atomic>
+ #include <chrono>
+ #include <cstdint>
+-#include <iostream>
++#include <iomanip>
++#include <limits>
++#include <mutex>
++#include <numeric>
+ #include <random>
++#include <cmath>
++#include <sstream>
++#include <string>
++#include <thread>
+ #include <vector>
+-#include <iomanip>
++
++#include "imgui.h"
++#include "imgui_impl_glfw.h"
++#include "imgui_impl_opengl3.h"
++#include "implot.h"
++
++#include <GLFW/glfw3.h>
++
++struct BenchmarkResult {
++    int size;
++    int64_t sum_basic;
++    int64_t sum_neon;
++    double time_basic_us;
++    double time_neon_us;
++    double speedup;
++};
++
++namespace {
++
++const std::vector<int> kSizes = {10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000};
++
++std::vector<BenchmarkResult> g_results;
++std::mutex g_results_mutex;
++std::atomic<bool> g_benchmark_running{false};
++std::atomic<float> g_progress{0.0f};
++std::mutex g_status_mutex;
++std::string g_status = "Ready";
++bool g_show_log_scale = true;
++int g_selected_row = -1;
++int g_repeats_per_size = 12;
++
++std::string format_size(int size) {
++    if (size >= 1000000) {
++        return std::to_string(size / 1000000) + "M";
++    }
++    if (size >= 1000) {
++        return std::to_string(size / 1000) + "K";
++    }
++    return std::to_string(size);
++}
++
++std::string format_integer(int64_t value) {
++    std::string digits = std::to_string(value);
++    std::string formatted;
++    const int first_group = static_cast<int>(digits.size()) % 3;
++    if (first_group > 0) {
++        formatted.append(digits.substr(0, first_group));
++        if (digits.size() > static_cast<size_t>(first_group)) {
++            formatted.push_back(' ');
++        }
++    }
++    for (size_t i = first_group; i < digits.size(); i += 3) {
++        formatted.append(digits.substr(i, 3));
++        if (i + 3 < digits.size()) {
++            formatted.push_back(' ');
++        }
++    }
++    return formatted.empty() ? digits : formatted;
++}
++
++void set_status(const std::string& status) {
++    std::lock_guard<std::mutex> lock(g_status_mutex);
++    g_status = status;
++}
++
++std::string get_status() {
++    std::lock_guard<std::mutex> lock(g_status_mutex);
++    return g_status;
++}
++
++std::string format_time(double time_us) {
++    std::ostringstream out;
++    out << std::fixed << std::setprecision(2);
++    if (time_us >= 1000.0) {
++        out << (time_us / 1000.0) << " ms";
++    } else {
++        out << time_us << " us";
++    }
++    return out.str();
++}
++
++double compute_plot_max(const std::vector<double>& values) {
++    if (values.empty()) {
++        return 1.0;
++    }
++    const double max_value = *std::max_element(values.begin(), values.end());
++    return max_value > 0.0 ? max_value * 1.12 : 1.0;
++}
++
++double average(const std::vector<double>& samples) {
++    if (samples.empty()) {
++        return 0.0;
++    }
++    const double sum = std::accumulate(samples.begin(), samples.end(), 0.0);
++    return sum / static_cast<double>(samples.size());
++}
++
++void apply_theme() {
++    ImGuiStyle& style = ImGui::GetStyle();
++    style.WindowRounding = 10.0f;
++    style.ChildRounding = 8.0f;
++    style.FrameRounding = 8.0f;
++    style.PopupRounding = 8.0f;
++    style.ScrollbarRounding = 10.0f;
++    style.GrabRounding = 8.0f;
++    style.TabRounding = 8.0f;
++    style.WindowPadding = ImVec2(6.0f, 10.0f);
++    style.FramePadding = ImVec2(16.0f, 12.0f);
++    style.ItemSpacing = ImVec2(8.0f, 10.0f);
++    style.ItemInnerSpacing = ImVec2(10.0f, 8.0f);
++    style.CellPadding = ImVec2(12.0f, 10.0f);
++    style.IndentSpacing = 20.0f;
++    style.ScrollbarSize = 16.0f;
++    style.GrabMinSize = 12.0f;
++
++    ImVec4* colors = style.Colors;
++    colors[ImGuiCol_WindowBg] = ImVec4(0.08f, 0.09f, 0.11f, 1.00f);
++    colors[ImGuiCol_ChildBg] = ImVec4(0.11f, 0.12f, 0.15f, 1.00f);
++    colors[ImGuiCol_PopupBg] = ImVec4(0.10f, 0.11f, 0.14f, 0.98f);
++    colors[ImGuiCol_Border] = ImVec4(0.20f, 0.22f, 0.27f, 0.75f);
++    colors[ImGuiCol_FrameBg] = ImVec4(0.14f, 0.16f, 0.20f, 1.00f);
++    colors[ImGuiCol_FrameBgHovered] = ImVec4(0.18f, 0.21f, 0.26f, 1.00f);
++    colors[ImGuiCol_FrameBgActive] = ImVec4(0.21f, 0.24f, 0.31f, 1.00f);
++    colors[ImGuiCol_TitleBg] = ImVec4(0.08f, 0.09f, 0.11f, 1.00f);
++    colors[ImGuiCol_TitleBgActive] = ImVec4(0.10f, 0.11f, 0.14f, 1.00f);
++    colors[ImGuiCol_Button] = ImVec4(0.20f, 0.47f, 0.78f, 1.00f);
++    colors[ImGuiCol_ButtonHovered] = ImVec4(0.25f, 0.53f, 0.86f, 1.00f);
++    colors[ImGuiCol_ButtonActive] = ImVec4(0.16f, 0.40f, 0.68f, 1.00f);
++    colors[ImGuiCol_Header] = ImVec4(0.16f, 0.19f, 0.24f, 1.00f);
++    colors[ImGuiCol_HeaderHovered] = ImVec4(0.20f, 0.25f, 0.31f, 1.00f);
++    colors[ImGuiCol_HeaderActive] = ImVec4(0.18f, 0.22f, 0.28f, 1.00f);
++    colors[ImGuiCol_Tab] = ImVec4(0.12f, 0.14f, 0.18f, 1.00f);
++    colors[ImGuiCol_TabHovered] = ImVec4(0.18f, 0.24f, 0.31f, 1.00f);
++    colors[ImGuiCol_TabActive] = ImVec4(0.17f, 0.22f, 0.29f, 1.00f);
++    colors[ImGuiCol_CheckMark] = ImVec4(0.42f, 0.75f, 0.95f, 1.00f);
++    colors[ImGuiCol_SliderGrab] = ImVec4(0.42f, 0.75f, 0.95f, 1.00f);
++    colors[ImGuiCol_SliderGrabActive] = ImVec4(0.55f, 0.84f, 0.98f, 1.00f);
++    colors[ImGuiCol_Separator] = ImVec4(0.19f, 0.21f, 0.26f, 1.00f);
++    colors[ImGuiCol_TableHeaderBg] = ImVec4(0.13f, 0.15f, 0.18f, 1.00f);
++    colors[ImGuiCol_TableBorderStrong] = ImVec4(0.24f, 0.26f, 0.31f, 1.00f);
++    colors[ImGuiCol_TableBorderLight] = ImVec4(0.17f, 0.18f, 0.22f, 1.00f);
++    colors[ImGuiCol_TableRowBg] = ImVec4(0.09f, 0.10f, 0.12f, 1.00f);
++    colors[ImGuiCol_TableRowBgAlt] = ImVec4(0.12f, 0.13f, 0.16f, 1.00f);
++    colors[ImGuiCol_PlotLines] = ImVec4(0.35f, 0.77f, 0.95f, 1.00f);
++    colors[ImGuiCol_PlotHistogram] = ImVec4(0.61f, 0.78f, 0.31f, 1.00f);
++    style.ScaleAllSizes(1.15f);
++    ImGui::GetIO().FontGlobalScale = 1.28f;
++}
+ 
+-int main() {
+-    std::vector<int> sizes = {10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000};
++void run_benchmark() {
++    g_benchmark_running = true;
++    g_progress = 0.0f;
++    g_selected_row = -1;
++    set_status("Running benchmark...");
++
++    const int repeats = std::max(g_repeats_per_size, 1);
++    std::vector<BenchmarkResult> local_results;
++    local_results.reserve(kSizes.size());
+ 
+     std::random_device rd;
+     std::mt19937 gen(rd());
+     std::uniform_int_distribution<int32_t> dis(-100, 100);
+ 
+-    std::cout << "\n==========================================================================================================================\n";
+-    std::cout << "| Размер массива |    Базовая сумма   |    NEON сумма      | Базовая время (мкс)  | NEON время (мкс)   | Ускорение (раз) |\n";
+-    std::cout << "==========================================================================================================================\n";
++    for (size_t idx = 0; idx < kSizes.size(); ++idx) {
++        const int size = kSizes[idx];
++        set_status("Testing size " + format_size(size) + " | " + std::to_string(repeats) + " passes");
++
++        std::vector<int32_t> values(size);
++        for (int32_t& value : values) {
++            value = dis(gen);
++        }
++
++        std::vector<double> basic_samples;
++        std::vector<double> neon_samples;
++        basic_samples.reserve(repeats);
++        neon_samples.reserve(repeats);
++
++        int64_t sum_basic = 0;
++        int64_t sum_neon = 0;
++
++        for (int attempt = 0; attempt < repeats; ++attempt) {
++            const float local_progress =
++                (static_cast<float>(idx) + static_cast<float>(attempt + 1) / static_cast<float>(repeats)) /
++                static_cast<float>(kSizes.size());
++            g_progress = local_progress;
++
++            const auto basic_start = std::chrono::high_resolution_clock::now();
++            sum_basic = sum_array_basic(values);
++            const auto basic_end = std::chrono::high_resolution_clock::now();
++            basic_samples.push_back(
++                std::chrono::duration_cast<std::chrono::nanoseconds>(basic_end - basic_start).count() / 1000.0
++            );
++
++            const auto neon_start = std::chrono::high_resolution_clock::now();
++            sum_neon = sum_array_neon(values);
++            const auto neon_end = std::chrono::high_resolution_clock::now();
++            neon_samples.push_back(
++                std::chrono::duration_cast<std::chrono::nanoseconds>(neon_end - neon_start).count() / 1000.0
++            );
++
++            if (sum_basic != sum_neon) {
++                set_status("Error: results do not match");
++                g_benchmark_running = false;
++                return;
++            }
++        }
++
++        const double time_basic_us = average(basic_samples);
++        const double time_neon_us = average(neon_samples);
++
++        local_results.push_back({
++            size,
++            sum_basic,
++            sum_neon,
++            time_basic_us,
++            time_neon_us,
++            time_neon_us > 0.0 ? time_basic_us / time_neon_us : 0.0,
++        });
++
++        {
++            std::lock_guard<std::mutex> lock(g_results_mutex);
++            g_results = local_results;
++        }
++    }
++
++    g_progress = 1.0f;
++    set_status("Done");
++    g_benchmark_running = false;
++}
++
++}  // namespace
+ 
+-    for (int size : sizes) {
+-        std::vector<int32_t> v(size);
++int main() {
++    if (!glfwInit()) {
++        return -1;
++    }
+ 
+-        for (int32_t& num : v) {
+-            num = dis(gen);
+-        }
++    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
++    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
++    GLFWwindow* window = glfwCreateWindow(1440, 920, "NEON Performance Benchmark", nullptr, nullptr);
++    if (window == nullptr) {
++        glfwTerminate();
++        return -1;
++    }
+ 
+-        auto start_basic = std::chrono::high_resolution_clock::now();
+-        int64_t sum_basic_func = sum_array_basic(v);
+-        auto end_basic = std::chrono::high_resolution_clock::now();
+-        auto duration_basic = std::chrono::duration_cast<std::chrono::nanoseconds>(end_basic - start_basic);
+-        double time_basic_us = duration_basic.count() / 1000.0; // микросекунды
++    glfwMakeContextCurrent(window);
++    glfwSwapInterval(1);
++
++    IMGUI_CHECKVERSION();
++    ImGui::CreateContext();
++    ImPlot::CreateContext();
++    ImGui_ImplGlfw_InitForOpenGL(window, true);
++    ImGui_ImplOpenGL3_Init("#version 130");
++    ImGui::StyleColorsDark();
++    apply_theme();
++
++    while (!glfwWindowShouldClose(window)) {
++        glfwPollEvents();
+ 
+-        auto start_neon = std::chrono::high_resolution_clock::now();
+-        int64_t sum_neon_func = sum_array_neon(v);
+-        auto end_neon = std::chrono::high_resolution_clock::now();
+-        auto duration_neon = std::chrono::duration_cast<std::chrono::nanoseconds>(end_neon - start_neon);
+-        double time_neon_us = duration_neon.count() / 1000.0; // микросекунды
++        ImGui_ImplOpenGL3_NewFrame();
++        ImGui_ImplGlfw_NewFrame();
++        ImGui::NewFrame();
+ 
+-        if (sum_basic_func != sum_neon_func) {
+-            std::cerr << "Ошибка: суммы не совпадают для размера " << size << "!\n";
+-            return 1;
++        std::vector<BenchmarkResult> results_copy;
++        {
++            std::lock_guard<std::mutex> lock(g_results_mutex);
++            results_copy = g_results;
+         }
+ 
+-        double speedup = time_basic_us / time_neon_us;
++        const bool is_running = g_benchmark_running.load();
++        const float progress = g_progress.load();
++        const std::string status = get_status();
++
++        const ImGuiViewport* viewport = ImGui::GetMainViewport();
++        ImGui::SetNextWindowPos(viewport->WorkPos, ImGuiCond_Always);
++        ImGui::SetNextWindowSize(viewport->WorkSize, ImGuiCond_Always);
++        ImGui::Begin("NEON Benchmark", nullptr, ImGuiWindowFlags_NoCollapse);
++
++        ImGui::Text("NEON array processing benchmark");
++        ImGui::TextColored(ImVec4(0.63f, 0.67f, 0.73f, 1.0f), "Benchmark view with larger type, averaged runs and a single continuous layout.");
++        ImGui::Spacing();
++        ImGui::Separator();
++        ImGui::Spacing();
++
++        ImGui::AlignTextToFramePadding();
++        ImGui::Text("NEON available: %s", neon_enabled_at_compile_time() ? "Yes" : "No");
++        ImGui::SameLine(340.0f);
++        ImGui::Checkbox("Log scale", &g_show_log_scale);
++        ImGui::SameLine(590.0f);
++        ImGui::SetNextItemWidth(240.0f);
++        ImGui::SliderInt("Passes per size", &g_repeats_per_size, 3, 30);
++        ImGui::SameLine();
++        if (ImGui::Button("Run benchmark", ImVec2(210.0f, 0.0f)) && !is_running) {
++            {
++                std::lock_guard<std::mutex> lock(g_results_mutex);
++                g_results.clear();
++            }
++            std::thread(run_benchmark).detach();
++        }
++        ImGui::Spacing();
++        ImGui::TextColored(ImVec4(0.72f, 0.75f, 0.80f, 1.0f), "%s", status.c_str());
++        if (is_running) {
++            ImGui::ProgressBar(progress, ImVec2(-1.0f, 10.0f));
++        }
++        ImGui::Spacing();
++        ImGui::Separator();
++        ImGui::Spacing();
+ 
+-        std::cout << "| " << std::setw(14) << size
+-                  << " | " << std::setw(18) << sum_basic_func
+-                  << " | " << std::setw(18) << sum_neon_func
+-                  << " | " << std::setw(20) << std::fixed << std::setprecision(2) << time_basic_us
+-                  << " | " << std::setw(18) << std::fixed << std::setprecision(2) << time_neon_us
+-                  << " | " << std::setw(14) << std::fixed << std::setprecision(2) << speedup << "x |\n";
++        if (!results_copy.empty()) {
++            double avg_speedup = 0.0;
++            double max_speedup = 0.0;
++            double min_neon_us = std::numeric_limits<double>::max();
++            double avg_delta_us = 0.0;
+ 
+-        std::cout << "--------------------------------------------------------------------------------------------------------------------------\n";
+-    }
++            for (const auto& result : results_copy) {
++                avg_speedup += result.speedup;
++                max_speedup = std::max(max_speedup, result.speedup);
++                min_neon_us = std::min(min_neon_us, result.time_neon_us);
++                avg_delta_us += (result.time_basic_us - result.time_neon_us);
++            }
+ 
++            avg_speedup /= static_cast<double>(results_copy.size());
++            avg_delta_us /= static_cast<double>(results_copy.size());
++
++            std::ostringstream avg_speedup_text;
++            avg_speedup_text << std::fixed << std::setprecision(2) << avg_speedup << "x";
++            std::ostringstream max_speedup_text;
++            max_speedup_text << std::fixed << std::setprecision(2) << max_speedup << "x";
++
++            if (ImGui::BeginTable("summary", 4, ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_BordersInnerV, ImVec2(-1.0f, 72.0f))) {
++                ImGui::TableNextRow();
++
++                ImGui::TableSetColumnIndex(0);
++                ImGui::TextColored(ImVec4(0.66f, 0.70f, 0.76f, 1.0f), "Average speedup");
++                ImGui::Text("%s", avg_speedup_text.str().c_str());
++
++                ImGui::TableSetColumnIndex(1);
++                ImGui::TextColored(ImVec4(0.66f, 0.70f, 0.76f, 1.0f), "Peak speedup");
++                ImGui::Text("%s", max_speedup_text.str().c_str());
++
++                ImGui::TableSetColumnIndex(2);
++                ImGui::TextColored(ImVec4(0.66f, 0.70f, 0.76f, 1.0f), "Best NEON time");
++                ImGui::Text("%s", format_time(min_neon_us).c_str());
++
++                ImGui::TableSetColumnIndex(3);
++                ImGui::TextColored(ImVec4(0.66f, 0.70f, 0.76f, 1.0f), "Average gain");
++                ImGui::Text("%s", format_time(avg_delta_us).c_str());
++
++                ImGui::EndTable();
++            }
++
++            ImGui::Spacing();
++
++            if (ImGui::BeginTable(
++                    "Results",
++                    6,
++                    ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable,
++                    ImVec2(0.0f, 0.0f))) {
++                ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, 120.0f);
++                ImGui::TableSetupColumn("Basic sum");
++                ImGui::TableSetupColumn("NEON sum");
++                ImGui::TableSetupColumn("Basic avg");
++                ImGui::TableSetupColumn("NEON avg");
++                ImGui::TableSetupColumn("Speedup", ImGuiTableColumnFlags_WidthFixed, 120.0f);
++                ImGui::TableHeadersRow();
++
++                for (int i = 0; i < static_cast<int>(results_copy.size()); ++i) {
++                    const auto& result = results_copy[i];
++                    ImGui::TableNextRow();
++
++                    ImGui::TableSetColumnIndex(0);
++                    if (ImGui::Selectable(format_size(result.size).c_str(), g_selected_row == i, ImGuiSelectableFlags_SpanAllColumns)) {
++                        g_selected_row = (g_selected_row == i) ? -1 : i;
++                    }
++
++                    ImGui::TableSetColumnIndex(1);
++                    ImGui::Text("%s", format_integer(result.sum_basic).c_str());
++                    ImGui::TableSetColumnIndex(2);
++                    ImGui::Text("%s", format_integer(result.sum_neon).c_str());
++                    ImGui::TableSetColumnIndex(3);
++                    ImGui::Text("%s", format_time(result.time_basic_us).c_str());
++                    ImGui::TableSetColumnIndex(4);
++                    ImGui::Text("%s", format_time(result.time_neon_us).c_str());
++                    ImGui::TableSetColumnIndex(5);
++                    ImGui::PushStyleColor(
++                        ImGuiCol_Text,
++                        result.speedup >= 1.0 ? ImVec4(0.58f, 0.88f, 0.54f, 1.0f) : ImVec4(0.95f, 0.53f, 0.48f, 1.0f)
++                    );
++                    ImGui::Text("%.2fx", result.speedup);
++                    ImGui::PopStyleColor();
++                }
++                ImGui::EndTable();
++            }
++
++            if (g_selected_row >= 0 && g_selected_row < static_cast<int>(results_copy.size())) {
++                const auto& selected = results_copy[g_selected_row];
++                ImGui::Spacing();
++                ImGui::Text("Selected size %s", format_size(selected.size).c_str());
++                ImGui::TextColored(
++                    ImVec4(0.70f, 0.74f, 0.78f, 1.0f),
++                    "Basic %s | NEON %s | gain %.2fx",
++                    format_time(selected.time_basic_us).c_str(),
++                    format_time(selected.time_neon_us).c_str(),
++                    selected.speedup
++                );
++                ImGui::Spacing();
++            }
++
++            std::vector<double> x;
++            std::vector<double> y_basic;
++            std::vector<double> y_neon;
++            std::vector<double> y_speedup;
++            x.reserve(results_copy.size());
++            y_basic.reserve(results_copy.size());
++            y_neon.reserve(results_copy.size());
++            y_speedup.reserve(results_copy.size());
++
++            for (const auto& result : results_copy) {
++                x.push_back(static_cast<double>(result.size));
++                y_basic.push_back(result.time_basic_us);
++                y_neon.push_back(result.time_neon_us);
++                y_speedup.push_back(result.speedup);
++            }
++
++            ImGui::Spacing();
++
++            const float available_height = ImGui::GetContentRegionAvail().y;
++            const float top_plot_height = std::max(260.0f, available_height * 0.64f);
++            const float bottom_plot_height = std::max(220.0f, available_height * 0.36f - 8.0f);
++            const double time_y_max = compute_plot_max(y_basic);
++            const double speedup_y_max = compute_plot_max(y_speedup);
++
++            ImPlot::PushStyleVar(ImPlotStyleVar_PlotPadding, ImVec2(4.0f, 6.0f));
++            ImPlot::PushStyleVar(ImPlotStyleVar_LabelPadding, ImVec2(4.0f, 4.0f));
++            ImPlot::PushStyleVar(ImPlotStyleVar_LegendPadding, ImVec2(4.0f, 4.0f));
++
++            if (ImPlot::BeginPlot("Execution time", ImVec2(-1.0f, top_plot_height), ImPlotFlags_NoMenus)) {
++                ImPlot::SetupAxes("Array size", "Average time (us)");
++                if (g_show_log_scale) {
++                    ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
++                    ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Log10);
++                } else {
++                    ImPlot::SetupAxisLimits(ImAxis_Y1, 0.0, time_y_max, ImGuiCond_Always);
++                }
++                ImPlot::PlotLine("Basic", x.data(), y_basic.data(), static_cast<int>(x.size()));
++                ImPlot::PlotLine("NEON", x.data(), y_neon.data(), static_cast<int>(x.size()));
++                ImPlot::EndPlot();
++            }
++
++            if (ImPlot::BeginPlot("Speedup profile", ImVec2(-1.0f, bottom_plot_height), ImPlotFlags_NoMenus)) {
++                ImPlot::SetupAxes("Array size", "Acceleration (x)");
++                if (g_show_log_scale) {
++                    ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
++                } else {
++                    ImPlot::SetupAxisLimits(ImAxis_Y1, 0.0, speedup_y_max, ImGuiCond_Always);
++                }
++                ImPlot::PlotLine("Speedup", x.data(), y_speedup.data(), static_cast<int>(x.size()));
++                ImPlot::EndPlot();
++            }
++
++            ImPlot::PopStyleVar(3);
++        } else {
++            ImGui::Text("No benchmark data yet");
++            ImGui::Spacing();
++            ImGui::TextColored(
++                ImVec4(0.67f, 0.71f, 0.76f, 1.0f),
++                "Run the benchmark to populate the summary table and smooth performance charts."
++            );
++        }
++
++        ImGui::End();
++
++        ImGui::Render();
++        int display_w = 0;
++        int display_h = 0;
++        glfwGetFramebufferSize(window, &display_w, &display_h);
++        glViewport(0, 0, display_w, display_h);
++        glClearColor(0.06f, 0.07f, 0.09f, 1.0f);
++        glClear(GL_COLOR_BUFFER_BIT);
++        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
++        glfwSwapBuffers(window);
++    }
++
++    ImGui_ImplOpenGL3_Shutdown();
++    ImGui_ImplGlfw_Shutdown();
++    ImPlot::DestroyContext();
++    ImGui::DestroyContext();
++    glfwDestroyWindow(window);
++    glfwTerminate();
+     return 0;
+-}
+\ No newline at end of file
++}
