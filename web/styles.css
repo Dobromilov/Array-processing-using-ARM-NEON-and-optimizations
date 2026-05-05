@@ -140,6 +140,26 @@ body {
   box-shadow: 0 8px 24px rgba(33, 47, 56, 0.08);
 }
 
+.table-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.table-head h2 {
+  margin: 0;
+  font-size: 1.02rem;
+}
+
+.table-head span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
 .chart-card {
   margin-top: 18px;
   border-radius: 18px;
@@ -257,18 +277,25 @@ body {
 .dot-basic {
   fill: #ffc44d;
   stroke: #fff2ca;
-  stroke-width: 1.2;
+  stroke-width: 1.5;
 }
 
 .dot-neon {
   fill: #56f3ff;
   stroke: #e1fbff;
-  stroke-width: 1.2;
+  stroke-width: 1.5;
+}
+
+.point-pair-link {
+  stroke: rgba(255, 255, 255, 0.45);
+  stroke-width: 1.1;
+  stroke-linecap: round;
 }
 
 .hover-area {
   fill: transparent;
   cursor: pointer;
+  pointer-events: all;
 }
 
 .chart-foot {
@@ -349,7 +376,14 @@ tr:last-child td {
 }
 
 .scroll {
-  overflow-x: auto;
+  max-height: 680px;
+  overflow: auto;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .error {

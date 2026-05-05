@@ -115,7 +115,7 @@ function App() {
           Number.isFinite(row.size) &&
           Number.isFinite(row.basic_time_ns) &&
           Number.isFinite(row.neon_time_ns) &&
-          row.size > 0
+          row.size >= 0
       )
       .slice()
       .sort((a, b) => a.size - b.size);
@@ -129,12 +129,14 @@ function App() {
     const plotH = height - margin.top - margin.bottom;
 
     const sizes = safeRows.map((row) => row.size);
-    const allTimesUs = safeRows.flatMap((row) => [row.basic_time_ns / 1000, row.neon_time_ns / 1000]);
+    const allTimesUs = safeRows.flatMap((row) => [
+      Math.max(0.001, row.basic_time_ns / 1000),
+      Math.max(0.001, row.neon_time_ns / 1000)
+    ]);
 
     const minSize = Math.min(...sizes);
     const maxSize = Math.max(...sizes);
-    const minLog = Math.log10(minSize);
-    const maxLog = Math.log10(maxSize);
+    const sizeRange = Math.max(maxSize - minSize, 1);
     const minTimeUs = Math.max(0.001, Math.min(...allTimesUs));
     const maxTimeUs = Math.max(...allTimesUs);
     const yBottom = minTimeUs * 0.8;
@@ -144,12 +146,12 @@ function App() {
 
     const scaleX = (size) => {
       if (minSize === maxSize) return margin.left + plotW / 2;
-      const t = (Math.log10(size) - minLog) / (maxLog - minLog);
+      const t = (size - minSize) / sizeRange;
       return margin.left + t * plotW;
     };
 
     const scaleY = (timeNs) => {
-      const valueUs = Math.max(0.000001, timeNs / 1000);
+      const valueUs = Math.max(0.001, timeNs / 1000);
       const t = (Math.log10(valueUs) - minYLog) / Math.max(maxYLog - minYLog, 1e-9);
       return margin.top + (1 - t) * plotH;
     };
@@ -168,6 +170,14 @@ function App() {
       };
     });
 
+    const xTicks = Array.from({ length: 6 }, (_, i) => {
+      const value = minSize + (sizeRange * i) / 5;
+      return {
+        value,
+        x: scaleX(value)
+      };
+    });
+
     return {
       rows: safeRows,
       width,
@@ -178,7 +188,8 @@ function App() {
       scaleY,
       basicPath: toPath("basic_time_ns"),
       neonPath: toPath("neon_time_ns"),
-      yTicks
+      yTicks,
+      xTicks
     };
   }, [rows]);
 
@@ -192,6 +203,8 @@ function App() {
       bestSize: best.size
     };
   }, [rows]);
+
+  const tableRows = chart?.rows ?? rows;
 
   return (
     <main className="wrap">
@@ -241,7 +254,7 @@ function App() {
               <div className="chart-head">
                 <div>
                   <h2>Time Curve: NEON + BASIC</h2>
-                  <p>Log-scale X and Y, Y axis in µs.</p>
+                  <p>Linear X and log-scale Y, Y axis in µs.</p>
                 </div>
                 <div className="legend">
                   <span className="legend-item neon">NEON</span>
@@ -305,6 +318,12 @@ function App() {
                     className="axis-line"
                   />
 
+                  {chart.xTicks.map((tick) => (
+                    <text key={tick.value} x={tick.x} y={chart.height - 24} className="axis-label x-label">
+                      {formatInt(Math.round(tick.value))}
+                    </text>
+                  ))}
+
                   <path d={chart.neonPath} className="line-neon-glow" />
                   <path d={chart.neonPath} className="line-neon" />
                   <path d={chart.basicPath} className="line-basic" />
@@ -314,17 +333,23 @@ function App() {
                     const neonY = chart.scaleY(row.neon_time_ns);
                     const basicY = chart.scaleY(row.basic_time_ns);
                     const isActive = hoveredIndex === idx;
+                    const dense = chart.rows.length > 200;
+                    const markerRadius = isActive ? 4 : dense ? 1.45 : 4.6;
+                    const offset = dense ? 1.7 : 4;
+                    const basicX = x - offset;
+                    const neonX = x + offset;
+                    const hitWidth = Math.max(2, chart.plotW / chart.rows.length);
+
                     return (
                       <g key={`point-${row.size}-${idx}`}>
-                        <text x={x} y={chart.height - 24} className="axis-label x-label">
-                          {formatInt(row.size)}
-                        </text>
-                        <circle cx={x} cy={basicY} r={isActive ? 5 : 4} className="dot-basic" />
-                        <circle cx={x} cy={neonY} r={isActive ? 5 : 4} className="dot-neon" />
-                        <circle
-                          cx={x}
-                          cy={(basicY + neonY) / 2}
-                          r={16}
+                        <line x1={basicX} y1={basicY} x2={neonX} y2={neonY} className="point-pair-link" />
+                        <circle cx={basicX} cy={basicY} r={markerRadius} className="dot-basic" />
+                        <circle cx={neonX} cy={neonY} r={markerRadius} className="dot-neon" />
+                        <rect
+                          x={x - hitWidth / 2}
+                          y={chart.margin.top}
+                          width={hitWidth}
+                          height={chart.height - chart.margin.top - chart.margin.bottom}
                           className="hover-area"
                           onMouseEnter={() => setHoveredIndex(idx)}
                           onMouseLeave={() => setHoveredIndex(null)}
@@ -354,6 +379,10 @@ function App() {
           )}
 
           <section className="table-card">
+            <div className="table-head">
+              <h2>Benchmark Rows</h2>
+              <span>{tableRows.length} values</span>
+            </div>
             <div className="scroll">
               <table>
                 <thead>
@@ -368,7 +397,7 @@ function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row, index) => {
+                  {tableRows.map((row, index) => {
                     const cls = verdictClass(row.speedup);
                     return (
                       <tr key={`${row.size}-${index}`}>

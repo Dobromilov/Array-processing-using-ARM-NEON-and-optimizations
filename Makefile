@@ -20,6 +20,7 @@ configure:
 	fi
 
 build: configure
+	rm -f ./go
 	$(CMAKE) --build $(BUILD_DIR) --parallel
 
 run: build
@@ -29,6 +30,7 @@ host-configure:
 	$(CMAKE) -S . -B $(HOST_BUILD_DIR) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)
 
 host-build: host-configure
+	rm -f ./go
 	$(CMAKE) --build $(HOST_BUILD_DIR) --parallel
 
 host-run: host-build

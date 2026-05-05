@@ -58,11 +58,15 @@ std::vector<int32_t> make_array(std::size_t size, std::mt19937& gen) {
 }
 
 std::size_t repetitions_for(std::size_t size) {
-    constexpr std::size_t target_elements = 20000000;
+    if (size == 0) {
+        return 1000;
+    }
+
+    constexpr std::size_t target_elements = 250000;
     std::size_t repetitions = target_elements / size;
 
-    if (repetitions < 20) {
-        return 20;
+    if (repetitions < 3) {
+        return 3;
     }
 
     return repetitions;
@@ -324,12 +328,12 @@ bool write_json_report(
 } // namespace
 
 int main(int argc, char** argv) {
-    const std::array<std::size_t, 20> sizes = {
-        50000, 100000, 150000, 200000, 250000,
-        300000, 350000, 400000, 450000, 500000,
-        550000, 600000, 650000, 700000, 750000,
-        800000, 850000, 900000, 950000, 1000000
-    };
+    std::vector<std::size_t> sizes;
+    sizes.reserve(1001);
+    for (std::size_t size = 0; size <= 100000; size += 100) {
+        sizes.push_back(size);
+    }
+
     std::mt19937 gen(42);
     volatile int64_t sink = 0;
     bool with_color = supports_color_output();
