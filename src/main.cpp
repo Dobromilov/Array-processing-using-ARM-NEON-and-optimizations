@@ -227,10 +227,10 @@ public:
         ImGui::Dummy(ImVec2(0, 20));
         ImGui::Spacing();
         ImGui::Spacing();
-        ImGui::TextColored(ImVec4(0.4f, 0.6f, 1.0f, 1.0f), "Basic Sum");
+        ImGui::TextColored(ImVec4(0.4f, 0.6f, 1.0f, 1.0f), "NEON Optimized");
         ImGui::SameLine();
         ImGui::Spacing();
-        ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "NEON Optimized");
+        ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "Basic Sum");
         ImGui::SameLine();
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 10);
     }
