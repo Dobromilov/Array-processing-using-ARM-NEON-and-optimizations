@@ -72,6 +72,51 @@ std::size_t repetitions_for(std::size_t size) {
     return repetitions;
 }
 
+std::vector<std::size_t> build_sizes_from_breakpoints(
+    const std::vector<std::size_t>& breakpoints,
+    std::size_t points_per_segment
+) {
+    if (breakpoints.empty()) {
+        return {};
+    }
+    if (breakpoints.size() == 1 || points_per_segment < 2) {
+        return breakpoints;
+    }
+
+    std::vector<std::size_t> sizes;
+    sizes.reserve((breakpoints.size() - 1) * (points_per_segment - 1) + 1);
+    sizes.push_back(breakpoints.front());
+
+    for (std::size_t i = 0; i + 1 < breakpoints.size(); ++i) {
+        std::size_t left = breakpoints[i];
+        std::size_t right = breakpoints[i + 1];
+        if (right < left) {
+            std::swap(left, right);
+        }
+
+        for (std::size_t point = 1; point < points_per_segment; ++point) {
+            double t = static_cast<double>(point) / static_cast<double>(points_per_segment - 1);
+            double value = static_cast<double>(left) + static_cast<double>(right - left) * t;
+            std::size_t next = static_cast<std::size_t>(std::llround(value));
+
+            if (next <= sizes.back()) {
+                if (sizes.back() >= right) {
+                    continue;
+                }
+                next = sizes.back() + 1;
+            }
+
+            sizes.push_back(next);
+        }
+
+        if (sizes.back() != right) {
+            sizes.push_back(right);
+        }
+    }
+
+    return sizes;
+}
+
 int64_t average_time_ns(
     const std::vector<int32_t>& v,
     std::size_t repetitions,
@@ -328,10 +373,12 @@ bool write_json_report(
 } // namespace
 
 int main(int argc, char** argv) {
-    const std::vector<std::size_t> sizes = {
+    const std::vector<std::size_t> size_breakpoints = {
         0, 10, 100, 1000, 10000,
         100000, 1000000, 10000000
     };
+    constexpr std::size_t kPointsPerSegment = 10;
+    const std::vector<std::size_t> sizes = build_sizes_from_breakpoints(size_breakpoints, kPointsPerSegment);
 
     std::mt19937 gen(42);
     volatile int64_t sink = 0;
