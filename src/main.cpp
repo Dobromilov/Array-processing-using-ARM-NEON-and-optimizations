@@ -328,11 +328,10 @@ bool write_json_report(
 } // namespace
 
 int main(int argc, char** argv) {
-    std::vector<std::size_t> sizes;
-    sizes.reserve(10);
-    for (std::size_t size = 10000000; size <= 100000000; size += 10000000) {
-        sizes.push_back(size);
-    }
+    const std::vector<std::size_t> sizes = {
+        0, 10, 100, 1000, 10000,
+        100000, 1000000, 10000000
+    };
 
     std::mt19937 gen(42);
     volatile int64_t sink = 0;

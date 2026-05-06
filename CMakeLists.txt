@@ -8,16 +8,26 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(BUILD_SHARED_ARRAY_PROCESSING "Build shared library target" ON)
 
+set(COMMON_WARN_FLAGS "")
+set(COMMON_OPT_FLAGS "")
+if(MSVC)
+    list(APPEND COMMON_WARN_FLAGS /W4)
+    list(APPEND COMMON_OPT_FLAGS /O2)
+else()
+    list(APPEND COMMON_WARN_FLAGS -Wall -Wextra -Wpedantic)
+    list(APPEND COMMON_OPT_FLAGS -O3)
+endif()
+
 add_library(array_processing_static STATIC src/array_sum.cpp)
 set_target_properties(array_processing_static PROPERTIES OUTPUT_NAME array_processing)
 target_include_directories(array_processing_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_compile_options(array_processing_static PRIVATE -O3 -Wall -Wextra -Wpedantic)
+target_compile_options(array_processing_static PRIVATE ${COMMON_OPT_FLAGS} ${COMMON_WARN_FLAGS})
 
 if(BUILD_SHARED_ARRAY_PROCESSING)
     add_library(array_processing_shared SHARED src/array_sum.cpp)
     set_target_properties(array_processing_shared PROPERTIES OUTPUT_NAME array_processing)
     target_include_directories(array_processing_shared PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-    target_compile_options(array_processing_shared PRIVATE -O3 -Wall -Wextra -Wpedantic)
+    target_compile_options(array_processing_shared PRIVATE ${COMMON_OPT_FLAGS} ${COMMON_WARN_FLAGS})
 endif()
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm|armv7.*)$" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
